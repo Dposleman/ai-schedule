@@ -1,0 +1,21 @@
+name: Coverage escalation check
+
+# Vercel Cron on the Hobby plan only allows once-a-day schedules, which is
+# too coarse for the "no one accepted the shift within an hour" check this
+# app needs — so this runs on GitHub Actions' free scheduler instead and
+# just hits the same API route Vercel Cron would have called.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call coverage-escalation endpoint
+        run: |
+          curl -sS -f "https://ai-schedule-alpha.vercel.app/api/cron/coverage-escalation" \
+            ${CRON_SECRET:+-H "Authorization: Bearer $CRON_SECRET"}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
