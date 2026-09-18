@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { attendance, locations } from "@/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { requireUser, badRequest } from "@/lib/api";
+import { requireUser, badRequest, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { distanceInMeters, GPS_ACCURACY_SLACK_METERS } from "@/lib/geo";
 
-export async function GET() {
+export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const [open] = await db
@@ -16,9 +16,9 @@ export async function GET() {
     .orderBy(desc(attendance.createdAt))
     .limit(1);
   return NextResponse.json({ open: open ?? null });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const body = await request.json().catch(() => null);
@@ -29,8 +29,22 @@ export async function POST(request: NextRequest) {
     // radius, before it ever writes the check-in: never trust client-side math.
     const locationId = body?.locationId || user.currentLocationId || user.homeLocationId;
     if (!locationId) return badRequest("No location on file to check in against.");
-    const [site] = await db.select().from(locations).where(eq(locations.id, locationId)).limit(1);
+    const [site] = await db
+      .select()
+      .from(locations)
+      .where(and(eq(locations.id, locationId), eq(locations.orgId, user.orgId)))
+      .limit(1);
     if (!site) return badRequest("Location not found.");
+
+    // Guard against a double clock-in from a flaky connection / double tap:
+    // one open (not-yet-checked-out) session per person, enforced here and
+    // backed by a unique partial index in the database (see ensureSchema).
+    const [alreadyOpen] = await db
+      .select()
+      .from(attendance)
+      .where(and(eq(attendance.userId, user.id), isNull(attendance.checkOutAt)))
+      .limit(1);
+    if (alreadyOpen) return badRequest("You already have an open shift clocked in — clock out first.");
 
     const lat = Number(body?.lat);
     const lng = Number(body?.lng);
@@ -43,13 +57,20 @@ export async function POST(request: NextRequest) {
     }
 
     const id = newId("att");
-    await db.insert(attendance).values({
-      id,
-      orgId: user.orgId,
-      shiftId: body.shiftId || null,
-      userId: user.id,
-      checkInAt: new Date().toISOString(),
-    });
+    try {
+      await db.insert(attendance).values({
+        id,
+        orgId: user.orgId,
+        shiftId: body.shiftId || null,
+        userId: user.id,
+        checkInAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      // Belt-and-suspenders: the DB's unique partial index rejects a second
+      // concurrent open session even if two requests raced past the check above.
+      if (err?.code === "23505") return badRequest("You already have an open shift clocked in — clock out first.");
+      throw err;
+    }
     return NextResponse.json({ ok: true, id });
   }
 
@@ -63,4 +84,4 @@ export async function POST(request: NextRequest) {
   }
 
   return badRequest("Unrecognized action.");
-}
+});

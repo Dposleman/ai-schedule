@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, requireRole, badRequest } from "@/lib/api";
+import { requireUser, requireRole, badRequest, withRoute } from "@/lib/api";
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = requireRole(user, ["owner", "manager"]);
@@ -19,4 +19,4 @@ export async function POST(request: NextRequest) {
     .where(and(eq(shifts.orgId, user.orgId), gte(shifts.date, body.weekStart), lte(shifts.date, body.weekEnd)));
 
   return NextResponse.json({ ok: true });
-}
+});

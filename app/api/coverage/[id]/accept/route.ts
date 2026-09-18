@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { coverageRequests, coverageCandidates, shifts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, notFound, badRequest } from "@/lib/api";
+import { requireUser, notFound, badRequest, withRoute } from "@/lib/api";
 import { notifyCoverageAccepted } from "@/lib/coverage";
 
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withRoute(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -31,4 +31,4 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   await notifyCoverageAccepted(user.orgId, id, user.id);
 
   return NextResponse.json({ ok: true });
-}
+});

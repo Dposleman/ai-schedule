@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { coverageRequests, coverageCandidates, shifts } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireRole, badRequest, notFound } from "@/lib/api";
+import { requireUser, requireRole, badRequest, notFound, withRoute } from "@/lib/api";
 import { openCoverageForShift } from "@/lib/coverage";
 
-export async function GET() {
+export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const requests = await db.select().from(coverageRequests).where(eq(coverageRequests.orgId, user.orgId));
@@ -24,9 +24,9 @@ export async function GET() {
     });
   }
   return NextResponse.json({ requests: enriched });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = requireRole(user, ["owner", "manager"]);
@@ -39,4 +39,4 @@ export async function POST(request: NextRequest) {
   if (!result) return notFound("Shift not found.");
 
   return NextResponse.json({ ok: true, id: result.requestId, candidateCount: result.candidateCount });
-}
+});

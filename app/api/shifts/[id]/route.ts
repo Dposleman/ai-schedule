@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { shifts } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, notFound } from "@/lib/api";
+import { and, eq, ne } from "drizzle-orm";
+import { requireUser, requireRole, notFound, badRequest, withRoute } from "@/lib/api";
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -24,11 +28,30 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (typeof body.endTime === "string") patch.endTime = body.endTime;
   if (typeof body.role === "string") patch.role = body.role;
 
+  // Warn instead of silently double-booking: if this assigns (or re-times)
+  // a shift for someone, make sure it doesn't overlap another shift they're
+  // already assigned to on the same day.
+  const assigneeId = patch.userId !== undefined ? patch.userId : existing.userId;
+  if (assigneeId && !body.force) {
+    const newStart = patch.startTime ?? existing.startTime;
+    const newEnd = patch.endTime ?? existing.endTime;
+    const sameDayShifts = await db
+      .select()
+      .from(shifts)
+      .where(and(eq(shifts.orgId, user.orgId), eq(shifts.userId, assigneeId), eq(shifts.date, existing.date), ne(shifts.id, id)));
+    const conflict = sameDayShifts.find((s) => timesOverlap(newStart, newEnd, s.startTime, s.endTime));
+    if (conflict) {
+      return badRequest(
+        `This person is already scheduled ${conflict.startTime}–${conflict.endTime} that day — assign anyway with force:true if that's intentional.`
+      );
+    }
+  }
+
   await db.update(shifts).set(patch).where(eq(shifts.id, id));
   return NextResponse.json({ ok: true });
-}
+});
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const DELETE = withRoute(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -37,4 +60,4 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   await db.delete(shifts).where(and(eq(shifts.id, id), eq(shifts.orgId, user.orgId)));
   return NextResponse.json({ ok: true });
-}
+});

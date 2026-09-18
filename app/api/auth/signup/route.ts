@@ -3,9 +3,10 @@ import { db, ensureSchema } from "@/db";
 import { organizations, users, locations, permissions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, newId, setSessionCookie } from "@/lib/auth";
-import { badRequest } from "@/lib/api";
+import { badRequest, withRoute } from "@/lib/api";
+import { isRateLimited, clientIp } from "@/lib/rate-limit";
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute(async (request: NextRequest) => {
   await ensureSchema();
   const body = await request.json().catch(() => null);
   const businessName = body?.businessName?.trim();
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
 
   if (!businessName || !name || !email || !password || password.length < 8) {
     return badRequest("Fill in all fields. The password must be at least 8 characters.");
+  }
+
+  if (isRateLimited(`signup:${clientIp(request)}`, 8, 15 * 60 * 1000)) {
+    return badRequest("Too many attempts — please wait a few minutes and try again.");
   }
 
   const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -43,4 +48,4 @@ export async function POST(request: NextRequest) {
 
   await setSessionCookie(userId);
   return NextResponse.json({ ok: true });
-}
+});

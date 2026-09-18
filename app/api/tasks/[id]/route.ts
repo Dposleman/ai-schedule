@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { dailyTasks } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, notFound } from "@/lib/api";
+import { requireUser, notFound, withRoute } from "@/lib/api";
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -15,4 +15,4 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = await request.json().catch(() => ({}));
   await db.update(dailyTasks).set({ completed: body.completed ? 1 : 0 }).where(eq(dailyTasks.id, id));
   return NextResponse.json({ ok: true });
-}
+});

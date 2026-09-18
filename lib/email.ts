@@ -48,3 +48,20 @@ export async function sendWelcomeEmail(params: {
   `;
   return sendEmail(params.email, "Your AI Schedule account is ready", html);
 }
+
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  name: string;
+  resetUrl: string;
+}): Promise<boolean> {
+  const html = `
+    <div style="font-family: -apple-system, Segoe UI, sans-serif; max-width: 480px; margin: 0 auto; color: #1c193c;">
+      <h2 style="margin-bottom: 4px;">Reset your password</h2>
+      <p>Hi ${params.name},</p>
+      <p>Someone requested a password reset for your AI Schedule account. If that was you, click below to choose a new password — this link expires in 1 hour and can only be used once.</p>
+      <p><a href="${params.resetUrl}" style="display: inline-block; background: #6c5ce7; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;">Reset password</a></p>
+      <p style="color: #9d9caf; font-size: 12px; margin-top: 24px;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+    </div>
+  `;
+  return sendEmail(params.to, "Reset your AI Schedule password", html);
+}

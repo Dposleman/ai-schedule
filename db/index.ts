@@ -203,5 +203,34 @@ export async function ensureSchema() {
       edit_published INTEGER NOT NULL DEFAULT 1,
       override_ai INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS password_reset_tokens_user_id_idx ON password_reset_tokens (user_id);
+
+    -- One open (not-yet-checked-out) attendance session per person: stops a
+    -- double-tapped "clock in" from creating two overlapping paid sessions.
+    CREATE UNIQUE INDEX IF NOT EXISTS attendance_open_session_idx ON attendance (user_id) WHERE check_out_at IS NULL;
+
+    -- Every list view is scoped to one organization (multi-tenant) or one
+    -- person's own records — these back exactly those lookups.
+    CREATE INDEX IF NOT EXISTS users_org_id_idx ON users (org_id);
+    CREATE INDEX IF NOT EXISTS shifts_org_id_date_idx ON shifts (org_id, date);
+    CREATE INDEX IF NOT EXISTS shifts_user_id_date_idx ON shifts (user_id, date);
+    CREATE INDEX IF NOT EXISTS absence_requests_org_id_idx ON absence_requests (org_id);
+    CREATE INDEX IF NOT EXISTS unavailability_user_id_date_idx ON unavailability (user_id, date);
+    CREATE INDEX IF NOT EXISTS transfers_org_id_idx ON transfers (org_id);
+    CREATE INDEX IF NOT EXISTS coverage_requests_org_id_idx ON coverage_requests (org_id);
+    CREATE INDEX IF NOT EXISTS coverage_candidates_request_id_idx ON coverage_candidates (request_id);
+    CREATE INDEX IF NOT EXISTS coverage_candidates_user_id_idx ON coverage_candidates (user_id);
+    CREATE INDEX IF NOT EXISTS daily_tasks_org_id_date_idx ON daily_tasks (org_id, date);
+    CREATE INDEX IF NOT EXISTS attendance_user_id_idx ON attendance (user_id);
+    CREATE INDEX IF NOT EXISTS attendance_org_id_idx ON attendance (org_id);
   `);
 }

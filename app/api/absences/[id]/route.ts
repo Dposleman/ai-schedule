@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { absenceRequests, shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, requireRole, notFound, badRequest } from "@/lib/api";
+import { requireUser, requireRole, notFound, badRequest, withRoute } from "@/lib/api";
 import { openCoverageForShift } from "@/lib/coverage";
 import { notify } from "@/lib/notifications";
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -53,4 +53,4 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   return NextResponse.json({ ok: true });
-}
+});

@@ -3,20 +3,23 @@ import { db, ensureSchema } from "@/db";
 import { coverageRequests, coverageCandidates, shifts, users, locations } from "@/db/schema";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { notifyMany, managersOf } from "@/lib/notifications";
+import { withRoute } from "@/lib/api";
 
 const ESCALATE_AFTER_MS = 60 * 60 * 1000; // 1 hour, per the "call them yourself" policy
 
-// Runs on a schedule (see vercel.json) — not tied to any one user's
-// session, so it can't reuse requireUser(). Vercel signs cron requests with
-// this header; when CRON_SECRET isn't set (e.g. running locally) the check
-// is skipped so local testing still works.
+// Runs on a schedule (see .github/workflows/coverage-escalation.yml — moved
+// off Vercel Cron, which on the Hobby plan only allows once-a-day schedules)
+// — not tied to any one user's session, so it can't reuse requireUser().
+// The workflow sends this header when CRON_SECRET is configured as a repo
+// secret; when it isn't set (e.g. running locally) the check is skipped so
+// local testing still works.
 function isAuthorized(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return true;
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withRoute(async (request: NextRequest) => {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -66,4 +69,4 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, escalated: stale.length });
-}
+});

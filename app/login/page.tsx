@@ -40,6 +40,7 @@ export default function LoginPage() {
         <form onSubmit={submit} className="auth-form">
           <label>{t("login.email")}<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></label>
           <label>{t("login.password")}<input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+          <p className="auth-switch" style={{ margin: "-4px 0 0" }}><Link href="/forgot-password">{t("login.forgotPassword")}</Link></p>
           {error && <p className="auth-error">{error}</p>}
           <button className="primary-button auth-submit" disabled={loading}>{loading ? <><LoaderCircle className="spin" size={16} /> {t("login.submitting")}</> : t("login.submit")}</button>
         </form>

@@ -2,22 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { organizations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireRole, badRequest, notFound } from "@/lib/api";
+import { requireUser, requireRole, badRequest, notFound, withRoute } from "@/lib/api";
 
 // Logos are stored as data: URIs directly on the row — small enough (capped
 // below) that this beats standing up object storage just for this, and
 // keeps upload/download a single request with no extra infra to configure.
 const MAX_LOGO_BYTES = 600_000;
 
-export async function GET() {
+export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const [org] = await db.select().from(organizations).where(eq(organizations.id, user.orgId)).limit(1);
   if (!org) return notFound("Organization not found.");
   return NextResponse.json({ organization: org });
-}
+});
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = requireRole(user, ["owner", "manager"]);
@@ -38,4 +38,4 @@ export async function PATCH(request: NextRequest) {
   if (Object.keys(patch).length === 0) return badRequest("Nothing to update.");
   await db.update(organizations).set(patch).where(eq(organizations.id, user.orgId));
   return NextResponse.json({ ok: true });
-}
+});

@@ -183,11 +183,18 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
   const [editing, setEditing] = useState<any | null>(null);
 
   const exportScheduleCsv = () => {
-    const rows = [["Employee", "Location", "Date", "Start", "End", "Status"]];
+    const rows = [[
+      t("planner.csv.employee"),
+      t("planner.csv.location"),
+      t("planner.csv.date"),
+      t("planner.csv.start"),
+      t("planner.csv.end"),
+      t("planner.csv.status"),
+    ]];
     scoped.forEach((s: any) => {
       const emp = employees.find((e: any) => e.id === s.userId);
       const loc = locations.find((l: any) => l.id === s.locationId);
-      rows.push([emp?.name ?? "Unassigned", loc?.name ?? "", s.date, s.startTime, s.endTime, s.status]);
+      rows.push([emp?.name ?? t("planner.csv.unassigned"), loc?.name ?? "", s.date, s.startTime, s.endTime, s.status]);
     });
     const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -368,7 +375,7 @@ export function DailyOperationsView({ tasks, locationId, onCreate, onToggle }: a
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("ops.kicker")}</span><h2>{t("ops.title")}</h2><p>{t("ops.subtitle")}</p></div></div>
       <div className="filter-row">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("ops.newTaskPlaceholder")} style={{ flex: 1, border: "1px solid var(--line)", borderRadius: 10, padding: "8px 11px", fontSize: 12 }} />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("ops.newTaskPlaceholder")} aria-label={t("ops.newTaskPlaceholder")} style={{ flex: 1, border: "1px solid var(--line)", borderRadius: 10, padding: "8px 11px", fontSize: 12 }} />
         <button className="primary-button" disabled={!name.trim() || !locationId} onClick={() => { onCreate(name.trim()); setName(""); }}>{t("ops.addTask")}</button>
       </div>
       {tasks.length === 0 ? <div className="empty-state">{t("ops.noTasks")}</div> : (
@@ -391,14 +398,26 @@ export function CostsView({ locations, employees, shifts }: any) {
   const { t, locale, lang } = useLanguage();
 
   const exportCsv = () => {
-    const rows = [["Location", "Employee", "Date", "Start", "End", "Hours", "Rate/h (DKK)", "Cost (DKK)"]];
+    const rows = [[
+      t("costs.csv.location"),
+      t("costs.csv.employee"),
+      t("costs.csv.date"),
+      t("costs.csv.start"),
+      t("costs.csv.end"),
+      t("costs.csv.hours"),
+      t("costs.csv.rate"),
+      t("costs.csv.cost"),
+    ]];
     locations.forEach((loc: any) => {
       shifts.filter((s: any) => s.locationId === loc.id && s.userId).forEach((s: any) => {
         const emp = employees.find((e: any) => e.id === s.userId);
         if (!emp) return;
         const hours = hoursBetween(s.startTime, s.endTime);
-        const rate = emp.hourlyRateCents / 100;
-        rows.push([loc.name, emp.name, s.date, s.startTime, s.endTime, hours.toFixed(2), rate.toFixed(2), (hours * rate).toFixed(2)]);
+        // Multiply in integer cents first, and only convert to decimal once
+        // at the very end — avoids compounding floating-point rounding
+        // error across the rate → cost conversion.
+        const costCents = Math.round(hours * emp.hourlyRateCents);
+        rows.push([loc.name, emp.name, s.date, s.startTime, s.endTime, hours.toFixed(2), (emp.hourlyRateCents / 100).toFixed(2), (costCents / 100).toFixed(2)]);
       });
     });
     const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");

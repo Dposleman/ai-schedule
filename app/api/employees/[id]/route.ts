@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, notFound } from "@/lib/api";
+import { requireUser, requireRole, notFound, withRoute } from "@/lib/api";
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -34,9 +34,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   await db.update(users).set(patch).where(eq(users.id, id));
   return NextResponse.json({ ok: true });
-}
+});
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const DELETE = withRoute(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -54,4 +54,4 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   await db.delete(users).where(eq(users.id, id));
   return NextResponse.json({ ok: true });
-}
+});

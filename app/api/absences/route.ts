@@ -2,20 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { absenceRequests, shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, badRequest } from "@/lib/api";
+import { requireUser, badRequest, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { openCoverageForShift } from "@/lib/coverage";
 import { notifyMany, managersOf } from "@/lib/notifications";
 
-export async function GET() {
+export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   let rows = await db.select().from(absenceRequests).where(eq(absenceRequests.orgId, user.orgId));
   if (user.role === "employee") rows = rows.filter((row) => row.userId === user.id);
   return NextResponse.json({ absences: rows });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const body = await request.json().catch(() => null);
@@ -67,4 +67,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, id });
-}
+});

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { locations, users } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, notFound, badRequest } from "@/lib/api";
+import { locations, users, shifts, dailyTasks } from "@/db/schema";
+import { and, eq, or } from "drizzle-orm";
+import { requireUser, requireRole, notFound, badRequest, withRoute } from "@/lib/api";
 
 const MAX_LOGO_BYTES = 600_000;
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -36,9 +36,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   await db.update(locations).set(patch).where(eq(locations.id, id));
   return NextResponse.json({ ok: true });
-}
+});
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const DELETE = withRoute(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -48,11 +48,24 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const [existing] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.orgId, user.orgId))).limit(1);
   if (!existing) return notFound("Location not found.");
 
-  const staffed = await db.select().from(users).where(eq(users.homeLocationId, id));
+  const staffed = await db
+    .select()
+    .from(users)
+    .where(or(eq(users.homeLocationId, id), eq(users.currentLocationId, id)));
   if (staffed.length > 0) {
     return NextResponse.json({ error: "Reassign this location's employees before deleting it." }, { status: 409 });
   }
 
+  const [upcomingShift] = await db.select().from(shifts).where(eq(shifts.locationId, id)).limit(1);
+  if (upcomingShift) {
+    return NextResponse.json({ error: "This location still has shifts on the schedule — remove or reassign them first." }, { status: 409 });
+  }
+
+  const [pendingTask] = await db.select().from(dailyTasks).where(eq(dailyTasks.locationId, id)).limit(1);
+  if (pendingTask) {
+    return NextResponse.json({ error: "This location still has daily tasks assigned — remove them first." }, { status: 409 });
+  }
+
   await db.delete(locations).where(eq(locations.id, id));
   return NextResponse.json({ ok: true });
-}
+});

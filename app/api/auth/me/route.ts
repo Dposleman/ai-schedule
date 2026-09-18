@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api";
+import { requireUser, withRoute } from "@/lib/api";
 
 // Used by the mobile app to check for an existing session on launch and to
 // fetch the signed-in user after a successful login. The web app doesn't
 // need this — app/page.tsx reads the session server-side instead — but it
 // costs nothing to share.
-export async function GET() {
+export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   return NextResponse.json({
@@ -23,4 +23,4 @@ export async function GET() {
       language: (user.language as "en" | "da") ?? "en",
     },
   });
-}
+});

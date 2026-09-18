@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { transfers, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, notFound } from "@/lib/api";
+import { requireUser, requireRole, notFound, withRoute } from "@/lib/api";
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
@@ -20,4 +20,4 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     await db.update(users).set({ currentLocationId: existing.fromLocationId }).where(eq(users.id, existing.userId));
   }
   return NextResponse.json({ ok: true });
-}
+});

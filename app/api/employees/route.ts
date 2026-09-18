@@ -2,25 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireRole, badRequest } from "@/lib/api";
+import { requireUser, requireRole, badRequest, withRoute } from "@/lib/api";
 import { hashPassword, newId } from "@/lib/auth";
 import { sendWelcomeEmail } from "@/lib/email";
 import { organizations } from "@/db/schema";
 import crypto from "node:crypto";
 
-export async function GET() {
+export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const rows = await db.select().from(users).where(eq(users.orgId, user.orgId));
   const safe = rows.map(({ passwordHash: _passwordHash, ...rest }) => rest);
   return NextResponse.json({ employees: safe });
-}
+});
 
 function tempPassword() {
   return crypto.randomBytes(6).toString("base64url");
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = requireRole(user, ["owner", "manager"]);
@@ -70,4 +70,4 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ ok: true, id, temporaryPassword: emailed ? null : password, emailed });
-}
+});

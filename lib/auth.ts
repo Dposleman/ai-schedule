@@ -9,7 +9,14 @@ import { SESSION_COOKIE_NAME as COOKIE_NAME } from "@/lib/session-cookie";
 const SESSION_DAYS = 30;
 
 function getSecret() {
-  return process.env.AUTH_SECRET || "dev-insecure-secret-change-me-in-production";
+  const secret = process.env.AUTH_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    // Never sign sessions with a guessable default in production — that
+    // would let anyone forge a login for any user ID.
+    throw new Error("AUTH_SECRET environment variable is not set. Refusing to sign sessions with an insecure default in production.");
+  }
+  return "dev-insecure-secret-change-me-in-production";
 }
 
 function sign(value: string) {
@@ -76,6 +83,14 @@ export async function getCurrentUser() {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return null;
   return user;
+}
+
+// Password-reset tokens are high-entropy random values, not user-chosen
+// passwords, so a fast, unsalted hash is the standard (and sufficient)
+// choice here — unlike hashPassword() above, which deliberately uses a slow,
+// salted algorithm to resist guessing a low-entropy human password.
+export function hashResetToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 export function newId(prefix: string) {

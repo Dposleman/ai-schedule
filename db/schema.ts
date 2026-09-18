@@ -152,6 +152,18 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
+// Short-lived, single-use tokens for "forgot password" — we only ever store
+// a hash of the token (like a password), never the token itself, so a DB
+// leak can't be used to reset anyone's password.
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { mode: "string" }).notNull(),
+  usedAt: timestamp("used_at", { mode: "string" }),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+});
+
 export const permissions = pgTable("permissions", {
   orgId: text("org_id").primaryKey(),
   approveLeave: integer("approve_leave").notNull().default(1),

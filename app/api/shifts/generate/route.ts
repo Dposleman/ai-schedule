@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { locations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireRole, badRequest } from "@/lib/api";
+import { requireUser, requireRole, badRequest, withRoute } from "@/lib/api";
 import { generateWeekSchedule } from "@/lib/scheduler";
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = requireRole(user, ["owner", "manager"]);
@@ -22,4 +22,4 @@ export async function POST(request: NextRequest) {
 
   const result = await generateWeekSchedule(user.orgId, body.weekStart, locationIds);
   return NextResponse.json(result);
-}
+});

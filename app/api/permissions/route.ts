@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { permissions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireRole } from "@/lib/api";
+import { requireUser, requireRole, withRoute } from "@/lib/api";
 
-export async function GET() {
+export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const [row] = await db.select().from(permissions).where(eq(permissions.orgId, user.orgId)).limit(1);
   return NextResponse.json({ permissions: row ?? null });
-}
+});
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = requireRole(user, ["owner"]);
@@ -25,4 +25,4 @@ export async function PATCH(request: NextRequest) {
 
   await db.update(permissions).set(patch).where(eq(permissions.orgId, user.orgId));
   return NextResponse.json({ ok: true });
-}
+});
