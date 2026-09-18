@@ -654,3 +654,37 @@ button { color: inherit; font: inherit; }
 .temp-password-box { display: flex; flex-direction: column; gap: 4px; border-radius: 10px; background: var(--accent-soft); margin-top: 10px; padding: 11px 13px; font-size: 15.5px; color: var(--accent-dark); }
 .temp-password-box code { font-size: 16px; font-weight: 800; letter-spacing: .02em; }
 .empty-state { border: 1px dashed var(--line); border-radius: 11px; padding: 26px; text-align: center; color: var(--muted); font-size: 15.5px; }
+
+/* Density: manager-facing views (.content.density-compact) stay tight so more
+   of the operation fits on screen at once; employee-facing views
+   (.content.density-airy) get extra room and larger type, since staff mostly
+   check one thing at a time rather than scanning a whole roster. */
+.density-compact .view-stack { gap: 12px; }
+.density-compact .view-heading { min-height: 56px; }
+.density-compact .view-heading h2 { font-size: 21px; }
+.density-compact .table-row { min-height: 52px; }
+.density-compact .card-heading, .density-compact .section-heading { min-height: 56px; padding: 11px 16px; }
+.density-compact .account-row, .density-compact .time-table { padding-top: 9px; padding-bottom: 9px; }
+
+.density-airy .view-stack { gap: 22px; }
+.density-airy .view-heading { min-height: 84px; }
+.density-airy .view-heading h2 { font-size: 30px; }
+.density-airy .view-heading p { font-size: 14px; }
+.density-airy .card-heading, .density-airy .section-heading { min-height: 76px; padding: 18px 22px; }
+.density-airy .card-heading h3, .density-airy .section-heading h3 { font-size: 19px; }
+.density-airy .card-heading p, .density-airy .section-heading p { font-size: 12.5px; }
+.density-airy .my-shift-grid > article, .density-airy .request-card, .density-airy .person-card,
+.density-airy .location-card, .density-airy .mini-phone, .density-airy .geo-card { padding: 24px; }
+.density-airy .my-shift-grid > article > strong { font-size: 24px; }
+.density-airy .my-shift-main > strong { font-size: 34px !important; }
+.density-airy .person-card h3, .density-airy .location-card h3 { font-size: 16px; }
+.density-airy .person-contact span, .density-airy .person-contact strong { font-size: 13.5px; }
+.density-airy .permission-row strong { font-size: 15px; }
+.density-airy .permission-row span { font-size: 12.5px; }
+.density-airy .directory-grid, .density-airy .locations-grid { gap: 18px; }
+.density-airy .empty-state { padding: 34px; font-size: 15px; }
+.density-airy .chat-head strong { font-size: 15px; }
+.density-airy .system-message p, .density-airy .candidate-message > div > p { font-size: 13px; }
+@media (max-width: 780px) {
+  .density-airy .view-heading h2 { font-size: 24px; }
+}

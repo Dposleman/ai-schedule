@@ -281,7 +281,7 @@ export default function AppShell({
 
         {banner && <div className="banner-error"><AlertTriangle size={14} /> {banner} <button onClick={() => setBanner(null)} aria-label={t("shell.close")}><X size={13} /></button></div>}
 
-        <div className="content">
+        <div className={`content ${currentUser.role === "employee" ? "density-airy" : "density-compact"}`}>
           {loading ? <div className="empty-state">{t("shell.loading")}</div> : (
             <>
               {activeNav === "resumen" && <ResumenView employees={employees} shifts={shifts} weekStart={weekStart} weekEnd={weekEnd} location={location} locations={locations} absences={absences} coverage={coverage} onGoPlanner={() => setActiveNav("planner")} onGoAusencias={() => setActiveNav("absences")} onGoChat={() => setActiveNav("chat")} />}
