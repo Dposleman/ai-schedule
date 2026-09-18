@@ -55,8 +55,10 @@ export async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS organizations (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      logo_url TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS logo_url TEXT;
 
     CREATE TABLE IF NOT EXISTS locations (
       id TEXT PRIMARY KEY,
@@ -68,8 +70,10 @@ export async function ensureSchema() {
       longitude DOUBLE PRECISION NOT NULL DEFAULT 12.5683,
       radius_meters INTEGER NOT NULL DEFAULT 50,
       budget_cents INTEGER NOT NULL DEFAULT 0,
+      logo_url TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
+    ALTER TABLE locations ADD COLUMN IF NOT EXISTS logo_url TEXT;
 
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,

@@ -338,6 +338,12 @@ const en: Dict = {
   "settings.ownersOnly": "Owners only",
   "settings.languageTitle": "Language",
   "settings.languageSubtitle": "Choose the app's display language.",
+  "settings.brandingTitle": "Branding",
+  "settings.brandingSubtitle": "Optional logos, shown small in the sidebar and location picker.",
+  "settings.companyLogo": "Company logo",
+  "settings.uploadLogo": "Upload",
+  "settings.removeLogo": "Remove",
+  "settings.logoUploadError": "Couldn't upload that image.",
 
   // Transfer modal
   "transferModal.kicker": "INTERNAL MOBILITY",
@@ -681,6 +687,12 @@ const da: Dict = {
   "settings.ownersOnly": "Kun ejere",
   "settings.languageTitle": "Sprog",
   "settings.languageSubtitle": "Vælg appens visningssprog.",
+  "settings.brandingTitle": "Branding",
+  "settings.brandingSubtitle": "Valgfrie logoer, vises i lille format i sidebjælken og lokationsvælgeren.",
+  "settings.companyLogo": "Virksomhedslogo",
+  "settings.uploadLogo": "Upload",
+  "settings.removeLogo": "Fjern",
+  "settings.logoUploadError": "Kunne ikke uploade billedet.",
 
   "transferModal.kicker": "INTERN MOBILITET",
   "transferModal.title": "Overflyt {name}",

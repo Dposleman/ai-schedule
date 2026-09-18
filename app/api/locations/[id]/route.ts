@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { locations, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, notFound } from "@/lib/api";
+import { requireUser, requireRole, notFound, badRequest } from "@/lib/api";
+
+const MAX_LOGO_BYTES = 600_000;
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +22,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (body.longitude !== undefined) patch.longitude = Number(body.longitude);
   if (body.radiusMeters !== undefined) patch.radiusMeters = Number(body.radiusMeters);
   if (body.budget !== undefined) patch.budgetCents = Math.round(Number(body.budget) * 100);
+  if (body.logoUrl === null) patch.logoUrl = null;
+  else if (typeof body.logoUrl === "string") {
+    if (!/^data:image\/(png|jpeg|jpg|webp|svg\+xml);base64,/.test(body.logoUrl)) {
+      return badRequest("Logo must be an uploaded image.");
+    }
+    if (body.logoUrl.length > MAX_LOGO_BYTES) return badRequest("That image is too large — try something under ~400KB.");
+    patch.logoUrl = body.logoUrl;
+  }
 
   const [existing] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.orgId, user.orgId))).limit(1);
   if (!existing) return notFound("Location not found.");

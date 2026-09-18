@@ -7,12 +7,40 @@ import { distanceInMeters } from "@/lib/geo";
 import {
   AlertTriangle, ArrowLeftRight, ArrowUpRight, Bot, Building2, Crown, CalendarDays,
   CalendarX2, Check, CheckCircle2, ClipboardCheck, Clock3, FileCheck2, Fingerprint, LockKeyhole,
-  Mail, MapPin, Phone, ReceiptText, Search, Send, ShieldCheck, Sparkles, Store,
+  Image as ImageIcon, Mail, MapPin, Phone, ReceiptText, Search, Send, ShieldCheck, Sparkles, Store,
   Trash2, Umbrella, UserPlus, UserCheck, UsersRound, WandSparkles, X,
 } from "lucide-react";
 import { weekDays, formatWeekRange, todayISO } from "@/lib/dates";
 import { useLanguage } from "@/app/language-context";
 import { LANGUAGES } from "@/lib/i18n";
+
+// Resizes/re-encodes an uploaded image client-side before it goes anywhere
+// near the network — logos only need to render small, so there's no reason
+// to ship (or store) a multi-megabyte original.
+function fileToLogoDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) { reject(new Error("That doesn't look like an image.")); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("That doesn't look like an image."));
+      img.onload = () => {
+        const maxDim = 256;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Image editing isn't supported in this browser.")); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 function initials(name: string) {
   return name.split(" ").filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -730,14 +758,26 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
 }
 
 /* ---------------- Settings ---------------- */
-export function SettingsView({ permissions, onToggle }: any) {
+export function SettingsView({ permissions, onToggle, organization, locations, onUpdateOrgLogo, onUpdateLocationLogo }: any) {
   const { t, lang, setLang } = useLanguage();
+  const [logoError, setLogoError] = useState<string | null>(null);
   const rows: [string, string, string][] = [
     ["approveLeave", t("settings.approveLeave"), t("settings.managersOwners")],
     ["moveEmployees", t("settings.moveEmployees"), t("settings.managersOwners")],
     ["editPublished", t("settings.editPublished"), t("settings.managersOwners")],
     ["overrideAI", t("settings.overrideAI"), t("settings.ownersOnly")],
   ];
+
+  const handleUpload = async (file: File, save: (dataUrl: string) => Promise<void> | void) => {
+    try {
+      const dataUrl = await fileToLogoDataUrl(file);
+      await save(dataUrl);
+      setLogoError(null);
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : t("settings.logoUploadError"));
+    }
+  };
+
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("settings.kicker")}</span><h2>{t("settings.title")}</h2><p>{t("settings.subtitle")}</p></div></div>
@@ -756,6 +796,43 @@ export function SettingsView({ permissions, onToggle }: any) {
           </div>
         </div>
       </article>
+
+      {organization && locations && onUpdateOrgLogo && onUpdateLocationLogo && (
+        <article className="data-card permission-card branding-card">
+          <div className="permission-row"><div><strong>{t("settings.brandingTitle")}</strong><span>{t("settings.brandingSubtitle")}</span></div></div>
+
+          <div className="logo-uploader-row">
+            <div className="logo-preview">{organization.logoUrl ? <img src={organization.logoUrl} alt="" /> : <ImageIcon size={18} />}</div>
+            <div className="logo-uploader-actions">
+              <strong>{t("settings.companyLogo")}</strong>
+              <div>
+                <label className="secondary-button logo-upload-btn">
+                  {t("settings.uploadLogo")}
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f, (url) => onUpdateOrgLogo(url)); e.target.value = ""; }} />
+                </label>
+                {organization.logoUrl && <button className="row-action" onClick={() => onUpdateOrgLogo(null)}>{t("settings.removeLogo")}</button>}
+              </div>
+            </div>
+          </div>
+
+          {locations.map((site: any) => (
+            <div className="logo-uploader-row" key={site.id}>
+              <div className="logo-preview">{site.logoUrl ? <img src={site.logoUrl} alt="" /> : <Store size={18} />}</div>
+              <div className="logo-uploader-actions">
+                <strong>{site.name}</strong>
+                <div>
+                  <label className="secondary-button logo-upload-btn">
+                    {t("settings.uploadLogo")}
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f, (url) => onUpdateLocationLogo(site.id, url)); e.target.value = ""; }} />
+                  </label>
+                  {site.logoUrl && <button className="row-action" onClick={() => onUpdateLocationLogo(site.id, null)}>{t("settings.removeLogo")}</button>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {logoError && <p className="logo-upload-error"><AlertTriangle size={13} /> {logoError}</p>}
+        </article>
+      )}
     </div>
   );
 }

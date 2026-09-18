@@ -31,7 +31,10 @@ type CurrentUser = {
 type LocationT = {
   id: string; name: string; address: string; openHours: string;
   latitude: number; longitude: number; radiusMeters: number; budgetCents: number;
+  logoUrl: string | null;
 };
+
+type OrgT = { id: string; name: string; logoUrl: string | null };
 
 type EmployeeT = {
   id: string; name: string; email: string; role: Role; occupation: string; phone: string;
@@ -121,6 +124,7 @@ export default function AppShell({
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<string | null>(null);
 
+  const [organization, setOrganization] = useState<OrgT | null>(null);
   const [locations, setLocations] = useState<LocationT[]>([]);
   const [employees, setEmployees] = useState<EmployeeT[]>([]);
   const [shifts, setShifts] = useState<ShiftT[]>([]);
@@ -153,7 +157,8 @@ export default function AppShell({
 
   const loadAll = useCallback(async () => {
     try {
-      const [loc, emp, shf, abs, unavail, trf, tsk, cov, perm] = await Promise.all([
+      const [org, loc, emp, shf, abs, unavail, trf, tsk, cov, perm] = await Promise.all([
+        api<{ organization: OrgT }>("/api/organization"),
         api<{ locations: LocationT[] }>("/api/locations"),
         api<{ employees: EmployeeT[] }>("/api/employees"),
         api<{ shifts: ShiftT[] }>(`/api/shifts?from=${weekStart}&to=${weekEnd}`),
@@ -164,6 +169,7 @@ export default function AppShell({
         api<{ requests: CoverageRequestT[] }>("/api/coverage"),
         api<{ permissions: PermissionsT | null }>("/api/permissions"),
       ]);
+      setOrganization(org.organization);
       setLocations(loc.locations);
       setEmployees(emp.employees);
       setShifts(shf.shifts);
@@ -262,11 +268,14 @@ export default function AppShell({
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><div className="brand-mark"><Sparkles size={18} fill="currentColor" /></div><span>{t("app.name")}</span></div>
+        <div className="brand">
+          <div className="brand-mark">{organization?.logoUrl ? <img src={organization.logoUrl} alt="" /> : <Sparkles size={18} fill="currentColor" />}</div>
+          <span>{t("app.name")}</span>
+        </div>
 
         <div className="location-picker">
           <button className="location-trigger" onClick={() => setLocationOpen((v) => !v)} aria-expanded={locationOpen} aria-label={t("shell.changeLocation")}>
-            <span className="location-symbol"><Building2 size={17} /></span>
+            <span className="location-symbol">{selectedLocation?.logoUrl ? <img src={selectedLocation.logoUrl} alt="" /> : <Building2 size={17} />}</span>
             <span className="location-copy"><small>{t("shell.yourOrg")}</small><strong>{selectedLocation ? selectedLocation.name : t("shell.allLocations")}</strong></span>
             <ChevronDown size={15} className={locationOpen ? "rotate" : ""} />
           </button>
@@ -398,7 +407,14 @@ export default function AppShell({
                   onDelete={async (id: string) => { try { await api(`/api/employees/${id}`, { method: "DELETE" }); await loadAll(); } catch (e) { fail(e); } }} />
               )}
               {activeNav === "settings" && permissions && (
-                <SettingsView permissions={permissions} onToggle={async (key: keyof PermissionsT) => { try { await api("/api/permissions", { method: "PATCH", body: JSON.stringify({ [key]: !permissions[key] }) }); await loadAll(); } catch (e) { fail(e); } }} />
+                <SettingsView
+                  permissions={permissions}
+                  onToggle={async (key: keyof PermissionsT) => { try { await api("/api/permissions", { method: "PATCH", body: JSON.stringify({ [key]: !permissions[key] }) }); await loadAll(); } catch (e) { fail(e); } }}
+                  organization={organization}
+                  locations={locations}
+                  onUpdateOrgLogo={async (logoUrl: string | null) => { try { await api("/api/organization", { method: "PATCH", body: JSON.stringify({ logoUrl }) }); await loadAll(); } catch (e) { fail(e); } }}
+                  onUpdateLocationLogo={async (locationId: string, logoUrl: string | null) => { try { await api(`/api/locations/${locationId}`, { method: "PATCH", body: JSON.stringify({ logoUrl }) }); await loadAll(); } catch (e) { fail(e); } }}
+                />
               )}
             </>
           )}

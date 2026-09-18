@@ -3,6 +3,8 @@ import { pgTable, text, integer, doublePrecision, timestamp } from "drizzle-orm/
 export const organizations = pgTable("organizations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  // Data URI (small PNG/JPG/SVG, capped client + server side) — optional, shown small in the sidebar.
+  logoUrl: text("logo_url"),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
@@ -16,6 +18,8 @@ export const locations = pgTable("locations", {
   longitude: doublePrecision("longitude").notNull().default(12.5683),
   radiusMeters: integer("radius_meters").notNull().default(50),
   budgetCents: integer("budget_cents").notNull().default(0),
+  // Data URI, optional — falls back to the org logo when unset.
+  logoUrl: text("logo_url"),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
