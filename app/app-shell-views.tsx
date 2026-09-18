@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Geolocation } from "@capacitor/geolocation";
 import { apiFetch } from "@/lib/api-client";
+import { distanceInMeters } from "@/lib/geo";
 import {
   AlertTriangle, ArrowLeftRight, ArrowUpRight, Bot, Building2, Crown, CalendarDays,
   CalendarX2, Check, CheckCircle2, ClipboardCheck, Clock3, FileCheck2, Fingerprint, LockKeyhole,
@@ -251,19 +252,11 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
 }
 
 /* ---------------- Time tracking ---------------- */
-function distanceInMeters(latitude: number, longitude: number, siteLatitude: number, siteLongitude: number) {
-  const radians = (value: number) => (value * Math.PI) / 180;
-  const earthRadius = 6_371_000;
-  const latitudeDelta = radians(siteLatitude - latitude);
-  const longitudeDelta = radians(siteLongitude - longitude);
-  const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(radians(latitude)) * Math.cos(radians(siteLatitude)) * Math.sin(longitudeDelta / 2) ** 2;
-  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 export function TimeTrackingView({ location, currentUser, shift, onError }: any) {
   const { t } = useLanguage();
   const [distance, setDistance] = useState<number | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<any | null>(null);
@@ -284,6 +277,7 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: any)
       const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
       setDistance(distanceInMeters(position.coords.latitude, position.coords.longitude, location.latitude, location.longitude));
       setAccuracy(position.coords.accuracy);
+      setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
       setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("time.locationError"));
@@ -292,7 +286,10 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: any)
 
   const checkIn = async () => {
     try {
-      const response = await apiFetch("/api/attendance", { method: "POST", body: JSON.stringify({ action: "check-in", shiftId: shift?.id }) });
+      const response = await apiFetch("/api/attendance", {
+        method: "POST",
+        body: JSON.stringify({ action: "check-in", shiftId: shift?.id, locationId: location.id, lat: coords?.lat, lng: coords?.lng }),
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setOpen({ id: data.id, checkInAt: new Date().toISOString(), checkOutAt: null });

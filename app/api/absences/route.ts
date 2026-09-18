@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { absenceRequests } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { absenceRequests, shifts } from "@/db/schema";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { requireUser, badRequest } from "@/lib/api";
 import { newId } from "@/lib/auth";
+import { openCoverageForShift } from "@/lib/coverage";
+import { notifyMany, managersOf } from "@/lib/notifications";
 
 export async function GET() {
   const { user, error } = await requireUser();
@@ -20,15 +22,49 @@ export async function POST(request: NextRequest) {
   if (!body?.startDate || !body?.endDate) return badRequest("Specify the requested period.");
 
   const id = newId("abs");
+  const type = body.type === "sick" ? "sick" : body.type === "unavailable" ? "unavailable" : "vacation";
+  const status = user.role === "owner" ? "approved" : "pending";
   await db.insert(absenceRequests).values({
     id,
     orgId: user.orgId,
     userId: user.id,
-    type: body.type === "sick" ? "sick" : body.type === "unavailable" ? "unavailable" : "vacation",
+    type,
     startDate: body.startDate,
     endDate: body.endDate,
     note: body.note?.trim() || "",
-    status: user.role === "owner" ? "approved" : "pending",
+    status,
   });
+
+  const managers = await managersOf(user.orgId);
+  await notifyMany(managers.filter((managerId) => managerId !== user.id), {
+    orgId: user.orgId,
+    type: "absence_requested",
+    title: type === "sick" ? `${user.name} called in sick` : `${user.name} requested time off`,
+    body: `${body.startDate} → ${body.endDate}${body.note?.trim() ? ` — "${body.note.trim()}"` : ""}`,
+    entityId: id,
+  });
+
+  // Sick leave is urgent — don't wait for a manager to click "approve"
+  // before looking for someone to cover the affected shifts. Planned leave
+  // (vacation/unavailable) still waits for approval, unless the requester
+  // is the owner, whose own requests are auto-approved above.
+  if (type === "sick" || status === "approved") {
+    const affected = await db
+      .select()
+      .from(shifts)
+      .where(
+        and(
+          eq(shifts.orgId, user.orgId),
+          eq(shifts.userId, user.id),
+          eq(shifts.published, 1),
+          gte(shifts.date, body.startDate),
+          lte(shifts.date, body.endDate)
+        )
+      );
+    for (const shift of affected) {
+      await openCoverageForShift(user.orgId, shift.id, type === "sick" ? `${user.name} called in sick` : `${user.name} is on approved leave`);
+    }
+  }
+
   return NextResponse.json({ ok: true, id });
 }

@@ -143,8 +143,10 @@ export async function ensureSchema() {
       reason TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'open',
       accepted_by_user_id TEXT,
+      escalated INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
+    ALTER TABLE coverage_requests ADD COLUMN IF NOT EXISTS escalated INTEGER NOT NULL DEFAULT 0;
 
     CREATE TABLE IF NOT EXISTS coverage_candidates (
       id TEXT PRIMARY KEY,
@@ -176,6 +178,19 @@ export async function ensureSchema() {
       auto_checkout INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'info',
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      entity_id TEXT,
+      read_at TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications (user_id);
 
     CREATE TABLE IF NOT EXISTS permissions (
       org_id TEXT PRIMARY KEY,

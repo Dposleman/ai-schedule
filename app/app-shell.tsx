@@ -50,6 +50,7 @@ type TaskT = { id: string; locationId: string; name: string; ownerUserId: string
 type CoverageCandidateT = { id: string; requestId: string; userId: string; matchScore: number; status: string };
 type CoverageRequestT = { id: string; shiftId: string; reason: string; status: string; acceptedByUserId: string | null; shift: ShiftT | null; candidates: CoverageCandidateT[] };
 type PermissionsT = { approveLeave: number; moveEmployees: number; editPublished: number; overrideAI: number };
+type NotificationT = { id: string; type: string; title: string; body: string; entityId: string | null; readAt: string | null; createdAt: string };
 
 type NavKey =
   | "resumen" | "myshift" | "planner" | "timetracking" | "dailyops" | "costs" | "team"
@@ -80,6 +81,18 @@ const employeeNavItems: { key: NavKey; labelKey: string; icon: any }[] = [
   { key: "absences", labelKey: "nav.absences", icon: Umbrella },
   { key: "chat", labelKey: "nav.chat", icon: MessageCircle },
 ];
+
+function timeAgo(iso: string, locale: string) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short" });
+}
 
 function initials(name: string) {
   return name.split(" ").filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
@@ -120,6 +133,10 @@ export default function AppShell({
 
   const [weekStart, setWeekStart] = useState(() => toISODate(startOfWeek()));
   const weekEnd = useMemo(() => toISODate(addDays(new Date(`${weekStart}T00:00:00`), 6)), [weekStart]);
+
+  const [notifications, setNotifications] = useState<NotificationT[]>([]);
+  const [notifUnread, setNotifUnread] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   const [aiModal, setAiModal] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -164,6 +181,36 @@ export default function AppShell({
   }, [weekStart, weekEnd]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await api<{ notifications: NotificationT[]; unread: number }>("/api/notifications");
+      setNotifications(data.notifications);
+      setNotifUnread(data.unread);
+    } catch {
+      // Silent — the bell just won't update this tick.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  const toggleNotifications = async () => {
+    const next = !notifOpen;
+    setNotifOpen(next);
+    if (next && notifUnread > 0) {
+      try {
+        await api("/api/notifications", { method: "POST" });
+        setNotifUnread(0);
+        setNotifications((rows) => rows.map((row) => ({ ...row, readAt: row.readAt ?? new Date().toISOString() })));
+      } catch {
+        // Non-critical — the dot can stay lit until the next poll.
+      }
+    }
+  };
 
   useEffect(() => {
     const savedTheme = (localStorage.getItem("ai-schedule-theme") as "light" | "dark" | null) ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -274,7 +321,32 @@ export default function AppShell({
           <div><p>{new Date().toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}</p><h1>{activeNav === "resumen" ? t("shell.hello", { name: currentUser.name.split(" ")[0] }) : t(availableNav.find((n) => n.key === activeNav)?.labelKey ?? (activeNav === "settings" ? "nav.settings" : "nav.resumen"))}</h1></div>
           <div className="topbar-actions">
             <button className="icon-button" onClick={toggleTheme} aria-label={theme === "light" ? t("shell.darkTheme") : t("shell.lightTheme")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
-            <button className="icon-button" aria-label={t("shell.notifications")}><Bell size={19} />{(absences.filter(a=>a.status==="pending").length + coverage.filter(c=>c.status==="open").length) > 0 && <span className="notification-dot" />}</button>
+            <div className="notif-wrap">
+              <button className="icon-button" aria-label={t("shell.notifications")} aria-expanded={notifOpen} onClick={toggleNotifications}>
+                <Bell size={19} />{notifUnread > 0 && <span className="notification-dot" />}
+              </button>
+              {notifOpen && (
+                <>
+                  <div className="notif-scrim" onClick={() => setNotifOpen(false)} />
+                  <div className="notif-menu">
+                    <div className="notif-menu-head"><strong>{t("notif.title")}</strong></div>
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">{t("notif.empty")}</div>
+                    ) : (
+                      <div className="notif-list">
+                        {notifications.map((n) => (
+                          <div key={n.id} className={`notif-item${n.readAt ? "" : " unread"}`}>
+                            <strong>{n.title}</strong>
+                            {n.body && <p>{n.body}</p>}
+                            <small>{timeAgo(n.createdAt, locale)}</small>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
             {currentUser.role !== "employee" && <button className="primary-button" onClick={() => { setAiModal(true); setGenerateResult(null); }}><WandSparkles size={17} /> {t("shell.generateWeekAI")}</button>}
           </div>
         </header>

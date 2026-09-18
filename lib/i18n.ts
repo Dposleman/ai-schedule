@@ -58,6 +58,9 @@ const en: Dict = {
   "shell.close": "Close",
   "shell.language": "Language",
   "shell.hello": "Hello, {name}",
+  "notif.title": "Notifications",
+  "notif.markAllRead": "Mark all as read",
+  "notif.empty": "No notifications yet.",
 
   // AI generate modal
   "ai.kicker": "SMART PLANNER",
@@ -415,6 +418,9 @@ const da: Dict = {
   "shell.close": "Luk",
   "shell.language": "Sprog",
   "shell.hello": "Hej, {name}",
+  "notif.title": "Notifikationer",
+  "notif.markAllRead": "Markér alle som læst",
+  "notif.empty": "Ingen notifikationer endnu.",
 
   "ai.kicker": "SMART PLANLÆGGER",
   "ai.title": "Generér uge · {range}",

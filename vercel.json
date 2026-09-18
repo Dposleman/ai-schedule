@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/coverage-escalation",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

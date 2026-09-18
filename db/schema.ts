@@ -96,6 +96,9 @@ export const coverageRequests = pgTable("coverage_requests", {
   reason: text("reason").notNull().default(""),
   status: text("status").notNull().default("open"),
   acceptedByUserId: text("accepted_by_user_id"),
+  // 1 once the hour-with-no-response escalation has fired for this request,
+  // so the cron job (and the manager's notification) only fires once.
+  escalated: integer("escalated").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
@@ -127,6 +130,21 @@ export const attendance = pgTable("attendance", {
   checkInAt: text("check_in_at"),
   checkOutAt: text("check_out_at"),
   autoCheckout: integer("auto_checkout").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+});
+
+// type: coverage_invite | coverage_needed | coverage_accepted | coverage_escalated | absence_requested | absence_decided
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  userId: text("user_id").notNull(),
+  type: text("type").notNull().default("info"),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  // Free-form pointer to whatever this notification is about (a coverage
+  // request id, an absence id...) so the UI can deep-link to it.
+  entityId: text("entity_id"),
+  readAt: text("read_at"),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 

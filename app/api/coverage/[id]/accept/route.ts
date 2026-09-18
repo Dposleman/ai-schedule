@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { coverageRequests, coverageCandidates, shifts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireUser, notFound, badRequest } from "@/lib/api";
+import { notifyCoverageAccepted } from "@/lib/coverage";
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,6 +28,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .set({ status: "declined" })
     .where(and(eq(coverageCandidates.requestId, id), eq(coverageCandidates.status, "invited")));
   await db.update(shifts).set({ userId: user.id, status: "scheduled" }).where(eq(shifts.id, coverageRequest.shiftId));
+  await notifyCoverageAccepted(user.orgId, id, user.id);
 
   return NextResponse.json({ ok: true });
 }
