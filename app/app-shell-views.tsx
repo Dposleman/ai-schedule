@@ -214,7 +214,7 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
       <div className="planner-layout">
         <article className="schedule-card full-schedule">
           <div className="section-heading">
-            <div><div className="section-title-line"><h3>{location === "all" ? t("shell.allLocations") : locations.find((l: any) => l.id === location)?.name}</h3>{hasDraft && <span className="draft-pill">{t("resumen.draft")}</span>}</div><p>{t("planner.employeesShifts", { employees: employees.length, shifts: scoped.length })}</p></div>
+            <div><div className="section-title-line"><h3>{location === "all" ? t("shell.allLocations") : locations.find((l: any) => l.id === location)?.name}</h3>{hasDraft && <span className="draft-pill">{t("resumen.draft")}</span>}</div><p>{t("planner.employeesCount", { count: employees.length })} · {t("planner.shiftsCount", { count: scoped.length })}</p></div>
             <div className="section-actions"><button className="secondary-button" onClick={onToday}>{t("planner.today")}</button><button className="circle-button" onClick={onPrevWeek} aria-label={t("planner.prevWeek")}>‹</button><button className="circle-button" onClick={onNextWeek} aria-label={t("planner.nextWeek")}>›</button></div>
           </div>
           {employees.length === 0 ? <div className="empty-state">{t("planner.addEmployeesFirst")}</div> : (

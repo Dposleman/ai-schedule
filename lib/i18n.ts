@@ -41,9 +41,9 @@ const en: Dict = {
   "nav.section.system": "SYSTEM",
 
   // Sidebar / shell
-  "shell.yourOrg": "Your organization",
+  "shell.yourOrg": "Organization",
   "shell.allLocations": "All locations",
-  "shell.locationsCount": "{count} locations",
+  "shell.locationsCount": "{count} location||{count} locations",
   "shell.employeesCount": "{count} employees",
   "shell.changeLocation": "Change location",
   "shell.mainNav": "Main navigation",
@@ -84,9 +84,9 @@ const en: Dict = {
   "resumen.coveredOf": "{covered} of {total} shifts covered in {location}.",
   "resumen.noShiftsYet": "No shifts have been generated for this week yet.",
   "resumen.weekCoverage": "Week coverage",
-  "resumen.uncovered": "{count} shifts uncovered",
+  "resumen.uncovered": "{count} shift uncovered||{count} shifts uncovered",
   "resumen.metric.hours": "ASSIGNED HOURS",
-  "resumen.metric.hoursDetail": "{count} shifts this week",
+  "resumen.metric.hoursDetail": "{count} shift this week||{count} shifts this week",
   "resumen.metric.coverage": "COVERAGE",
   "resumen.metric.coverageDetail": "{covered} of {total} shifts",
   "resumen.metric.team": "TEAM",
@@ -126,7 +126,8 @@ const en: Dict = {
   "planner.subtitle": "Generate with AI, review the draft and publish when ready.",
   "planner.publish": "Publish week",
   "planner.regenerate": "Regenerate with AI",
-  "planner.employeesShifts": "{employees} employees · {shifts} shifts",
+  "planner.employeesCount": "{count} employee||{count} employees",
+  "planner.shiftsCount": "{count} shift||{count} shifts",
   "planner.today": "Today",
   "planner.prevWeek": "Previous week",
   "planner.nextWeek": "Next week",
@@ -196,7 +197,7 @@ const en: Dict = {
 
   // Team
   "team.kicker": "TEAM",
-  "team.peopleCount": "{count} people",
+  "team.peopleCount": "{count} person||{count} people",
   "team.subtitle": "Each person keeps a home location and can temporarily support another.",
   "team.search": "Search",
   "team.colEmployee": "EMPLOYEE",
@@ -275,7 +276,7 @@ const en: Dict = {
   "chat.open": "open",
   "chat.shift": "Shift",
   "chat.coveredBy": "Covered by {name}",
-  "chat.invited": "{count} people invited",
+  "chat.invited": "{count} person invited||{count} people invited",
   "chat.acceptShift": "Accept shift",
   "chat.closed": "Closed",
   "chat.none": "No coverage requests yet.",
@@ -289,11 +290,11 @@ const en: Dict = {
 
   // Locations
   "locations.kicker": "LOCATIONS",
-  "locations.count": "{count} locations",
+  "locations.count": "{count} location||{count} locations",
   "locations.subtitle": "Who is assigned to each location.",
   "locations.new": "New location",
   "locations.noAddress": "No address",
-  "locations.peopleCount": "{count} people",
+  "locations.peopleCount": "{count} person||{count} people",
   "locations.noStaff": "No staff assigned",
   "locations.viewTeam": "View team",
   "locations.none": "No locations yet.",
@@ -407,9 +408,9 @@ const da: Dict = {
   "nav.section.operations": "DRIFT",
   "nav.section.system": "SYSTEM",
 
-  "shell.yourOrg": "Din organisation",
+  "shell.yourOrg": "Organisation",
   "shell.allLocations": "Alle lokationer",
-  "shell.locationsCount": "{count} lokationer",
+  "shell.locationsCount": "{count} lokation||{count} lokationer",
   "shell.employeesCount": "{count} medarbejdere",
   "shell.changeLocation": "Skift lokation",
   "shell.mainNav": "Hovednavigation",
@@ -448,9 +449,9 @@ const da: Dict = {
   "resumen.coveredOf": "{covered} af {total} vagter dækket på {location}.",
   "resumen.noShiftsYet": "Der er endnu ikke genereret vagter for denne uge.",
   "resumen.weekCoverage": "Ugens dækning",
-  "resumen.uncovered": "{count} vagter uden dækning",
+  "resumen.uncovered": "{count} vagt uden dækning||{count} vagter uden dækning",
   "resumen.metric.hours": "TILDELTE TIMER",
-  "resumen.metric.hoursDetail": "{count} vagter denne uge",
+  "resumen.metric.hoursDetail": "{count} vagt denne uge||{count} vagter denne uge",
   "resumen.metric.coverage": "DÆKNING",
   "resumen.metric.coverageDetail": "{covered} af {total} vagter",
   "resumen.metric.team": "TEAM",
@@ -487,7 +488,8 @@ const da: Dict = {
   "planner.subtitle": "Generér med AI, gennemgå udkastet, og udgiv når du er klar.",
   "planner.publish": "Udgiv uge",
   "planner.regenerate": "Genskab med AI",
-  "planner.employeesShifts": "{employees} medarbejdere · {shifts} vagter",
+  "planner.employeesCount": "{count} medarbejder||{count} medarbejdere",
+  "planner.shiftsCount": "{count} vagt||{count} vagter",
   "planner.today": "I dag",
   "planner.prevWeek": "Forrige uge",
   "planner.nextWeek": "Næste uge",
@@ -553,7 +555,7 @@ const da: Dict = {
   "costs.noLocations": "Opret lokationer for at se omkostninger.",
 
   "team.kicker": "TEAM",
-  "team.peopleCount": "{count} personer",
+  "team.peopleCount": "{count} person||{count} personer",
   "team.subtitle": "Hver person har en hjemmelokation og kan midlertidigt hjælpe en anden.",
   "team.search": "Søg",
   "team.colEmployee": "MEDARBEJDER",
@@ -628,7 +630,7 @@ const da: Dict = {
   "chat.open": "åbne",
   "chat.shift": "Vagt",
   "chat.coveredBy": "Dækket af {name}",
-  "chat.invited": "{count} personer inviteret",
+  "chat.invited": "{count} person inviteret||{count} personer inviteret",
   "chat.acceptShift": "Accepter vagt",
   "chat.closed": "Lukket",
   "chat.none": "Ingen dækningsanmodninger endnu.",
@@ -640,11 +642,11 @@ const da: Dict = {
   "staff.none": "Ingen resultater.",
 
   "locations.kicker": "LOKATIONER",
-  "locations.count": "{count} lokationer",
+  "locations.count": "{count} lokation||{count} lokationer",
   "locations.subtitle": "Hvem der er tilknyttet hver lokation.",
   "locations.new": "Ny lokation",
   "locations.noAddress": "Ingen adresse",
-  "locations.peopleCount": "{count} personer",
+  "locations.peopleCount": "{count} person||{count} personer",
   "locations.noStaff": "Intet personale tilknyttet",
   "locations.viewTeam": "Se team",
   "locations.none": "Ingen lokationer endnu.",
@@ -734,6 +736,13 @@ export const DICTS: Record<Lang, Dict> = { en, da };
 export function translate(lang: Lang, key: string, vars?: Record<string, string | number>) {
   const dict = DICTS[lang] ?? DICTS[DEFAULT_LANG];
   let text = dict[key] ?? DICTS[DEFAULT_LANG][key] ?? key;
+  // Strings with a "||" separate a singular and plural form, e.g. "{count}
+  // person||{count} people" — picked by whether vars.count === 1, so counts
+  // of 1 never fall back to the plural wording.
+  if (text.includes("||") && vars && typeof vars.count === "number") {
+    const [singular, plural] = text.split("||");
+    text = vars.count === 1 ? singular : plural;
+  }
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
       text = text.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
