@@ -7,6 +7,11 @@ export default defineConfig({
   root: path.resolve(__dirname, "mobile"),
   base: "./",
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname),
+    },
+  },
   css: { postcss: { plugins: [tailwindcss()] } },
   build: {
     outDir: path.resolve(__dirname, "mobile-dist"),

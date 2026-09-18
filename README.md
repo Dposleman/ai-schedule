@@ -67,13 +67,32 @@ Push to `main` and Vercel redeploys automatically. Required environment variable
   the current week's shifts.
 - **Welcome emails**: when `RESEND_API_KEY` is set, new accounts receive a real email
   with their sign-in details instead of a one-time on-screen password.
+- **Mobile app**: the `mobile/` folder (Capacitor + Vite) is a real native shell around
+  the same screens as the web app — its own login flow, session check on launch, and
+  every request goes through `lib/api-client.ts` against the deployed API with the
+  session cookie carried cross-origin (`SameSite=None`, and `middleware.ts` answers
+  CORS preflights for the WebView's origin). GPS clock-in uses `@capacitor/geolocation`.
+
+## Building the mobile app
+
+```bash
+npm run build:mobile   # bundles mobile/ with Vite into mobile-dist/
+npx cap sync android    # copies mobile-dist into the native Android project
+npx cap open android    # opens it in Android Studio to run or build an APK
+```
+
+By default the mobile bundle talks to the production deployment
+(`https://ai-schedule-alpha.vercel.app`). To point a dev build at a different API,
+set `VITE_API_URL` before `build:mobile`. If that API is served from somewhere other
+than `https://localhost` (Android's default WebView origin), add its origin to
+`ALLOWED_MOBILE_ORIGINS` (comma-separated) in that deployment's environment variables.
 
 ## What's still simplified (next phase)
 
-- The mobile app (`mobile/` folder, packaged with Capacitor) still points at the old
-  single-screen component with no session handling; wiring `mobile/src.tsx` up to
-  sign in against this API wasn't part of this phase.
 - Payroll export is CSV only for now (no PDF payslips yet).
+- The mobile app has been synced into the native Android project once, in this repo;
+  it isn't wired into a CI/release pipeline, so a new build+sync is needed after
+  future changes to `mobile/` or the shared UI before it reaches a device.
 
 ## Structure
 
@@ -89,4 +108,6 @@ db/index.ts              Postgres connection + table creation
 lib/auth.ts              sessions, password hashing
 lib/scheduler.ts         shift-generation algorithm
 lib/email.ts             welcome emails (Resend)
+lib/api-client.ts        fetch helper shared by web and mobile (adds the API base URL + credentials on mobile)
+mobile/                  Capacitor + Vite native app shell (own login screen, same UI components)
 ```

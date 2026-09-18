@@ -45,10 +45,15 @@ function parseSessionToken(token: string | undefined): string | null {
 
 export async function setSessionCookie(userId: string) {
   const store = await cookies();
+  const isProd = process.env.NODE_ENV === "production";
   store.set(COOKIE_NAME, createSessionToken(userId), {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // The mobile app (Capacitor) calls this API from a different origin than
+    // the one it's served from, so the cookie needs SameSite=None to be sent
+    // on those cross-origin requests — which in turn requires Secure. Locally
+    // (http, same-origin) we fall back to Lax so dev keeps working without https.
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
     path: "/",
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   });

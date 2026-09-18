@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Geolocation } from "@capacitor/geolocation";
+import { apiFetch } from "@/lib/api-client";
 import {
   AlertTriangle, ArrowLeftRight, ArrowUpRight, Bot, Building2, Crown, CalendarDays,
   CalendarX2, Check, CheckCircle2, ClipboardCheck, Clock3, FileCheck2, Fingerprint, LockKeyhole,
@@ -269,7 +270,7 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: any)
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/attendance").then((r) => r.json()).then((data) => { setOpen(data.open); setLoaded(true); }).catch(() => setLoaded(true));
+    apiFetch("/api/attendance").then((r) => r.json()).then((data) => { setOpen(data.open); setLoaded(true); }).catch(() => setLoaded(true));
   }, []);
 
   const inside = location && distance !== null && distance <= location.radiusMeters && (accuracy ?? 999) <= 60;
@@ -291,7 +292,7 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: any)
 
   const checkIn = async () => {
     try {
-      const response = await fetch("/api/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "check-in", shiftId: shift?.id }) });
+      const response = await apiFetch("/api/attendance", { method: "POST", body: JSON.stringify({ action: "check-in", shiftId: shift?.id }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setOpen({ id: data.id, checkInAt: new Date().toISOString(), checkOutAt: null });
@@ -301,7 +302,7 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: any)
   const checkOut = async () => {
     if (!open) return;
     try {
-      await fetch("/api/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "check-out", id: open.id }) });
+      await apiFetch("/api/attendance", { method: "POST", body: JSON.stringify({ action: "check-out", id: open.id }) });
       setOpen(null);
     } catch (e) { onError(e); }
   };

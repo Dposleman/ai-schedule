@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 import {
   AlertTriangle, ArrowLeftRight, ArrowUpRight, Bell, Banknote, Building2, CalendarDays,
   Check, ChevronDown, Clock3, ClipboardCheck, Fingerprint,
@@ -86,17 +86,20 @@ function initials(name: string) {
 }
 
 async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
+  const response = await apiFetch(url, init);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data as T;
 }
 
-export default function AppShell({ currentUser }: { currentUser: CurrentUser }) {
-  const router = useRouter();
+export default function AppShell({
+  currentUser,
+  onLoggedOut,
+}: {
+  currentUser: CurrentUser;
+  /** Mobile has no Next.js router to redirect to /login with, so it supplies its own. */
+  onLoggedOut?: () => void;
+}) {
   const { lang, t, locale, setLang } = useLanguage();
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [location, setLocation] = useState("all");
@@ -176,9 +179,9 @@ export default function AppShell({ currentUser }: { currentUser: CurrentUser }) 
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    await apiFetch("/api/auth/logout", { method: "POST" });
+    if (onLoggedOut) onLoggedOut();
+    else if (typeof window !== "undefined") window.location.href = "/login";
   };
 
   const availableNav = currentUser.role === "employee" ? employeeNavItems : managementNavItems;

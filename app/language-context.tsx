@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DEFAULT_LANG, LOCALE, Lang, translate } from "@/lib/i18n";
+import { apiFetch } from "@/lib/api-client";
 
 const STORAGE_KEY = "ai-schedule-lang";
 
@@ -48,9 +49,8 @@ export function LanguageProvider({
         // ignore
       }
       if (persist && persistToAccount) {
-        fetch("/api/account/language", {
+        apiFetch("/api/account/language", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ language: next }),
         }).catch(() => {});
       }
