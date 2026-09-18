@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const { user, error } = await requireUser();
   if (error) return error;
   const body = await request.json().catch(() => null);
-  if (!body?.name?.trim() || !body?.locationId || !body?.date) return badRequest("Faltan datos de la tarea.");
+  if (!body?.name?.trim() || !body?.locationId || !body?.date) return badRequest("Missing task data.");
 
   const id = newId("task");
   await db.insert(dailyTasks).values({

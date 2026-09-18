@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const { user, error } = await requireUser();
   if (error) return error;
   const body = await request.json().catch(() => null);
-  if (!body?.date) return badRequest("Falta la fecha.");
+  if (!body?.date) return badRequest("Missing date.");
 
   const [existing] = await db
     .select()

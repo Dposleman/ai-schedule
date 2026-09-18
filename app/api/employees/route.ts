@@ -4,6 +4,8 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireUser, requireRole, badRequest } from "@/lib/api";
 import { hashPassword, newId } from "@/lib/auth";
+import { sendWelcomeEmail } from "@/lib/email";
+import { organizations } from "@/db/schema";
 import crypto from "node:crypto";
 
 export async function GET() {
@@ -29,13 +31,13 @@ export async function POST(request: NextRequest) {
   const email = body?.email?.trim()?.toLowerCase();
   const role = body?.role === "owner" ? "owner" : body?.role === "manager" ? "manager" : "employee";
 
-  if (!name || !email) return badRequest("Nombre y correo son obligatorios.");
+  if (!name || !email) return badRequest("Name and email are required.");
   if (role === "owner" && user.role !== "owner") {
-    return NextResponse.json({ error: "Solo un propietario puede crear otro propietario." }, { status: 403 });
+    return NextResponse.json({ error: "Only an owner can create another owner." }, { status: 403 });
   }
 
   const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  if (existing) return badRequest("Ya existe una cuenta con ese correo.");
+  if (existing) return badRequest("An account with that email already exists.");
 
   const colors = ["blue", "green", "orange", "pink", "lilac"];
   const password = tempPassword();
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
     email,
     passwordHash: hashPassword(password),
     role,
-    occupation: body?.occupation?.trim() || (role === "manager" ? "Manager" : "Empleado"),
+    occupation: body?.occupation?.trim() || (role === "manager" ? "Manager" : "Employee"),
     phone: body?.phone?.trim() || "",
     color: colors[Math.floor(Math.random() * colors.length)],
     homeLocationId: body?.locationId || user.currentLocationId,
@@ -56,5 +58,16 @@ export async function POST(request: NextRequest) {
     weeklyHourTarget: Number(body?.weeklyHourTarget) || 37,
   });
 
-  return NextResponse.json({ ok: true, id, temporaryPassword: password });
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, user.orgId)).limit(1);
+  const origin = request.headers.get("origin") || undefined;
+  const emailed = await sendWelcomeEmail({
+    to: email,
+    name,
+    email,
+    password,
+    businessName: org?.name,
+    appUrl: origin,
+  });
+
+  return NextResponse.json({ ok: true, id, temporaryPassword: emailed ? null : password, emailed });
 }

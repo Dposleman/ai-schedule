@@ -19,6 +19,7 @@ export default async function Home() {
         color: user.color,
         homeLocationId: user.homeLocationId,
         currentLocationId: user.currentLocationId,
+        language: (user.language as "en" | "da") ?? "en",
       }}
     />
   );

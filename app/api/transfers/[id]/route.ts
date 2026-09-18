@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (permissionError) return permissionError;
 
   const [existing] = await db.select().from(transfers).where(and(eq(transfers.id, id), eq(transfers.orgId, user.orgId))).limit(1);
-  if (!existing) return notFound("Traslado no encontrado.");
+  if (!existing) return notFound("Transfer not found.");
 
   const body = await request.json().catch(() => ({}));
   if (body.status === "completed") {

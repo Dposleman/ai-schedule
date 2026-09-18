@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (permissionError) return permissionError;
 
   const [existing] = await db.select().from(shifts).where(and(eq(shifts.id, id), eq(shifts.orgId, user.orgId))).limit(1);
-  if (!existing) return notFound("Turno no encontrado.");
+  if (!existing) return notFound("Shift not found.");
 
   const body = await request.json().catch(() => ({}));
   const patch: Partial<typeof shifts.$inferInsert> = {};

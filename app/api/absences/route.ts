@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const { user, error } = await requireUser();
   if (error) return error;
   const body = await request.json().catch(() => null);
-  if (!body?.startDate || !body?.endDate) return badRequest("Indica el periodo solicitado.");
+  if (!body?.startDate || !body?.endDate) return badRequest("Specify the requested period.");
 
   const id = newId("abs");
   await db.insert(absenceRequests).values({

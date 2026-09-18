@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (body?.action === "check-out") {
-    if (!body?.id) return badRequest("Falta el identificador del fichaje.");
+    if (!body?.id) return badRequest("Missing check-in identifier.");
     await db
       .update(attendance)
       .set({ checkOutAt: new Date().toISOString(), autoCheckout: body.auto ? 1 : 0 })
@@ -43,5 +43,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  return badRequest("Acción no reconocida.");
+  return badRequest("Unrecognized action.");
 }

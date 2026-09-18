@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   if (!body?.locationId || !body?.date || !body?.startTime || !body?.endTime) {
-    return badRequest("Faltan datos del turno.");
+    return badRequest("Missing shift data.");
   }
 
   const id = newId("shift");

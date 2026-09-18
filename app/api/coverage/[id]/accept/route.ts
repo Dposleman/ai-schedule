@@ -10,15 +10,15 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   if (error) return error;
 
   const [coverageRequest] = await db.select().from(coverageRequests).where(and(eq(coverageRequests.id, id), eq(coverageRequests.orgId, user.orgId))).limit(1);
-  if (!coverageRequest) return notFound("Solicitud de cobertura no encontrada.");
-  if (coverageRequest.status !== "open") return badRequest("Este turno ya fue asignado.");
+  if (!coverageRequest) return notFound("Coverage request not found.");
+  if (coverageRequest.status !== "open") return badRequest("This shift has already been assigned.");
 
   const [candidate] = await db
     .select()
     .from(coverageCandidates)
     .where(and(eq(coverageCandidates.requestId, id), eq(coverageCandidates.userId, user.id)))
     .limit(1);
-  if (!candidate) return badRequest("No fuiste invitado a cubrir este turno.");
+  if (!candidate) return badRequest("You weren't invited to cover this shift.");
 
   await db.update(coverageRequests).set({ status: "closed", acceptedByUserId: user.id }).where(eq(coverageRequests.id, id));
   await db.update(coverageCandidates).set({ status: "accepted" }).where(eq(coverageCandidates.id, candidate.id));

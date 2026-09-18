@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => null);
-  if (!body?.name?.trim()) return badRequest("El local necesita un nombre.");
+  if (!body?.name?.trim()) return badRequest("The location needs a name.");
 
   const id = newId("loc");
   await db.insert(locations).values({

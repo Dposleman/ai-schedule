@@ -12,10 +12,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));
-  if (body.status !== "approved" && body.status !== "rejected") return badRequest("Estado inválido.");
+  if (body.status !== "approved" && body.status !== "rejected") return badRequest("Invalid status.");
 
   const [existing] = await db.select().from(absenceRequests).where(and(eq(absenceRequests.id, id), eq(absenceRequests.orgId, user.orgId))).limit(1);
-  if (!existing) return notFound("Solicitud no encontrada.");
+  if (!existing) return notFound("Request not found.");
 
   await db.update(absenceRequests).set({ status: body.status }).where(eq(absenceRequests.id, id));
   return NextResponse.json({ ok: true });

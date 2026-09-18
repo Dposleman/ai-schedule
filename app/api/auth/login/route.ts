@@ -10,11 +10,11 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const email = body?.email?.trim()?.toLowerCase();
   const password = body?.password;
-  if (!email || !password) return badRequest("Escribe tu correo y contraseña.");
+  if (!email || !password) return badRequest("Enter your email and password.");
 
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user || !verifyPassword(password, user.passwordHash)) {
-    return badRequest("Correo o contraseña incorrectos.");
+    return badRequest("Incorrect email or password.");
   }
 
   await setSessionCookie(user.id);

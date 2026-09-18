@@ -33,10 +33,10 @@ export async function POST(request: NextRequest) {
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => null);
-  if (!body?.shiftId) return badRequest("Indica qué turno necesita cobertura.");
+  if (!body?.shiftId) return badRequest("Specify which shift needs coverage.");
 
   const [shift] = await db.select().from(shifts).where(and(eq(shifts.id, body.shiftId), eq(shifts.orgId, user.orgId))).limit(1);
-  if (!shift) return notFound("Turno no encontrado.");
+  if (!shift) return notFound("Shift not found.");
 
   await db.update(shifts).set({ userId: null, status: "open" }).where(eq(shifts.id, shift.id));
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     id: requestId,
     orgId: user.orgId,
     shiftId: shift.id,
-    reason: body.reason?.trim() || "Baja de última hora",
+    reason: body.reason?.trim() || "Last-minute absence",
     status: "open",
   });
 

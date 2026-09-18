@@ -10,14 +10,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error) return error;
 
   const [target] = await db.select().from(users).where(and(eq(users.id, id), eq(users.orgId, user.orgId))).limit(1);
-  if (!target) return notFound("Empleado no encontrado.");
+  if (!target) return notFound("Employee not found.");
 
   const isSelf = target.id === user.id;
   if (!isSelf) {
     const permissionError = requireRole(user, ["owner", "manager"]);
     if (permissionError) return permissionError;
     if (target.role === "owner" && user.role !== "owner") {
-      return NextResponse.json({ error: "Un manager no puede modificar a un propietario." }, { status: 403 });
+      return NextResponse.json({ error: "A manager cannot modify an owner." }, { status: 403 });
     }
   }
 
@@ -44,12 +44,12 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (permissionError) return permissionError;
 
   const [target] = await db.select().from(users).where(and(eq(users.id, id), eq(users.orgId, user.orgId))).limit(1);
-  if (!target) return notFound("Empleado no encontrado.");
+  if (!target) return notFound("Employee not found.");
   if (target.id === user.id) {
-    return NextResponse.json({ error: "No puedes eliminar tu propia cuenta." }, { status: 403 });
+    return NextResponse.json({ error: "You can't delete your own account." }, { status: 403 });
   }
   if (target.role === "owner" && user.role !== "owner") {
-    return NextResponse.json({ error: "Un manager no puede eliminar a un propietario." }, { status: 403 });
+    return NextResponse.json({ error: "A manager cannot delete an owner." }, { status: 403 });
   }
 
   await db.delete(users).where(eq(users.id, id));

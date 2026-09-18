@@ -19,10 +19,10 @@ export async function POST(request: NextRequest) {
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => null);
-  if (!body?.userId || !body?.toLocationId || !body?.startDate) return badRequest("Faltan datos del traslado.");
+  if (!body?.userId || !body?.toLocationId || !body?.startDate) return badRequest("Missing transfer data.");
 
   const [target] = await db.select().from(users).where(eq(users.id, body.userId)).limit(1);
-  if (!target) return notFound("Empleado no encontrado.");
+  if (!target) return notFound("Employee not found.");
 
   const id = newId("transfer");
   await db.insert(transfers).values({

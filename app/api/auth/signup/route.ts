@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
   const locationName = body?.locationName?.trim() || "Mi primer local";
 
   if (!businessName || !name || !email || !password || password.length < 8) {
-    return badRequest("Completa todos los campos. La contraseña debe tener al menos 8 caracteres.");
+    return badRequest("Fill in all fields. The password must be at least 8 characters.");
   }
 
   const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  if (existing) return badRequest("Ya existe una cuenta con ese correo.");
+  if (existing) return badRequest("An account with that email already exists.");
 
   const orgId = newId("org");
   const locationId = newId("loc");
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     email,
     passwordHash: hashPassword(password),
     role: "owner",
-    occupation: "Propietario/a",
+    occupation: "Owner",
     color: "pink",
     homeLocationId: locationId,
     currentLocationId: locationId,

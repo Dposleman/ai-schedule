@@ -85,8 +85,10 @@ export async function ensureSchema() {
       current_location_id TEXT,
       hourly_rate_cents INTEGER NOT NULL DEFAULT 0,
       weekly_hour_target INTEGER NOT NULL DEFAULT 0,
+      language TEXT NOT NULL DEFAULT 'en',
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en';
 
     CREATE TABLE IF NOT EXISTS shifts (
       id TEXT PRIMARY KEY,

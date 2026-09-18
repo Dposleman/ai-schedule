@@ -634,7 +634,12 @@ button { color: inherit; font: inherit; }
 
 .auth-shell { display: grid; min-height: 100vh; place-items: center; background: linear-gradient(160deg, #f7f6fd, #eeeaff); padding: 20px; }
 .auth-card { width: 100%; max-width: 380px; border: 1px solid var(--line); border-radius: 18px; background: white; padding: 30px 26px; box-shadow: 0 24px 60px rgba(28, 25, 60, .1); }
-.auth-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; color: var(--violet); font-family: var(--font-display), sans-serif; font-weight: 800; font-size: 15px; }
+.auth-brand { display: flex; align-items: center; gap: 8px; color: var(--violet); font-family: var(--font-display), sans-serif; font-weight: 800; font-size: 15px; }
+.auth-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.lang-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; gap: 2px; background: var(--surface, #f5f4fb); }
+.lang-switch button { border: 0; background: transparent; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; color: var(--muted); cursor: pointer; }
+.lang-switch button.active { background: var(--violet); color: white; }
+.lang-switch.compact button { padding: 4px 8px; font-size: 10px; }
 .auth-card h1 { margin: 0 0 6px; font-family: var(--font-display), sans-serif; font-size: 22px; }
 .auth-card > p { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
 .auth-form { display: flex; flex-direction: column; gap: 13px; }

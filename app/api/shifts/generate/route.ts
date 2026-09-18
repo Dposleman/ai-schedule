@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));
-  if (!body?.weekStart) return badRequest("Falta la fecha de inicio de semana.");
+  if (!body?.weekStart) return badRequest("Missing week start date.");
 
   let locationIds: string[] = body.locationIds;
   if (!locationIds || locationIds.length === 0) {

@@ -34,6 +34,7 @@ export const users = pgTable("users", {
   currentLocationId: text("current_location_id"),
   hourlyRateCents: integer("hourly_rate_cents").notNull().default(0),
   weeklyHourTarget: integer("weekly_hour_target").notNull().default(0),
+  language: text("language").notNull().default("en"),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 

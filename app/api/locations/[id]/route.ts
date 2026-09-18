@@ -22,7 +22,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (body.budget !== undefined) patch.budgetCents = Math.round(Number(body.budget) * 100);
 
   const [existing] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.orgId, user.orgId))).limit(1);
-  if (!existing) return notFound("Local no encontrado.");
+  if (!existing) return notFound("Location not found.");
 
   await db.update(locations).set(patch).where(eq(locations.id, id));
   return NextResponse.json({ ok: true });
@@ -36,11 +36,11 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (permissionError) return permissionError;
 
   const [existing] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.orgId, user.orgId))).limit(1);
-  if (!existing) return notFound("Local no encontrado.");
+  if (!existing) return notFound("Location not found.");
 
   const staffed = await db.select().from(users).where(eq(users.homeLocationId, id));
   if (staffed.length > 0) {
-    return NextResponse.json({ error: "Reasigna a los empleados de este local antes de eliminarlo." }, { status: 409 });
+    return NextResponse.json({ error: "Reassign this location's employees before deleting it." }, { status: 409 });
   }
 
   await db.delete(locations).where(eq(locations.id, id));

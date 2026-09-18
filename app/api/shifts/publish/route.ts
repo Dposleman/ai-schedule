@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));
-  if (!body?.weekStart || !body?.weekEnd) return badRequest("Falta el rango de la semana.");
+  if (!body?.weekStart || !body?.weekEnd) return badRequest("Missing week range.");
 
   await db
     .update(shifts)

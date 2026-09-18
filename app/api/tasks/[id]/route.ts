@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error) return error;
 
   const [existing] = await db.select().from(dailyTasks).where(and(eq(dailyTasks.id, id), eq(dailyTasks.orgId, user.orgId))).limit(1);
-  if (!existing) return notFound("Tarea no encontrada.");
+  if (!existing) return notFound("Task not found.");
 
   const body = await request.json().catch(() => ({}));
   await db.update(dailyTasks).set({ completed: body.completed ? 1 : 0 }).where(eq(dailyTasks.id, id));
