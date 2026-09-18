@@ -1,27 +1,26 @@
-import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, doublePrecision, timestamp } from "drizzle-orm/pg-core";
 
-export const organizations = sqliteTable("organizations", {
+export const organizations = pgTable("organizations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
-export const locations = sqliteTable("locations", {
+export const locations = pgTable("locations", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   name: text("name").notNull(),
   address: text("address").notNull().default(""),
   openHours: text("open_hours").notNull().default("08:00–23:00"),
-  latitude: real("latitude").notNull().default(55.6761),
-  longitude: real("longitude").notNull().default(12.5683),
+  latitude: doublePrecision("latitude").notNull().default(55.6761),
+  longitude: doublePrecision("longitude").notNull().default(12.5683),
   radiusMeters: integer("radius_meters").notNull().default(50),
   budgetCents: integer("budget_cents").notNull().default(0),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
 // role: owner | manager | employee
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   name: text("name").notNull(),
@@ -35,11 +34,11 @@ export const users = sqliteTable("users", {
   currentLocationId: text("current_location_id"),
   hourlyRateCents: integer("hourly_rate_cents").notNull().default(0),
   weeklyHourTarget: integer("weekly_hour_target").notNull().default(0),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
 // status: scheduled | open | completed
-export const shifts = sqliteTable("shifts", {
+export const shifts = pgTable("shifts", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   locationId: text("location_id").notNull(),
@@ -51,12 +50,12 @@ export const shifts = sqliteTable("shifts", {
   status: text("status").notNull().default("scheduled"),
   aiGenerated: integer("ai_generated").notNull().default(0),
   published: integer("published").notNull().default(0),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
 // type: vacation | sick | unavailable
 // status: pending | approved | rejected
-export const absenceRequests = sqliteTable("absence_requests", {
+export const absenceRequests = pgTable("absence_requests", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   userId: text("user_id").notNull(),
@@ -65,17 +64,17 @@ export const absenceRequests = sqliteTable("absence_requests", {
   endDate: text("end_date").notNull(),
   status: text("status").notNull().default("pending"),
   note: text("note").notNull().default(""),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
-export const unavailability = sqliteTable("unavailability", {
+export const unavailability = pgTable("unavailability", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   date: text("date").notNull(),
 });
 
 // type: temporary | permanent, status: active | completed
-export const transfers = sqliteTable("transfers", {
+export const transfers = pgTable("transfers", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   userId: text("user_id").notNull(),
@@ -85,21 +84,21 @@ export const transfers = sqliteTable("transfers", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date"),
   status: text("status").notNull().default("active"),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
 // status: open | closed
-export const coverageRequests = sqliteTable("coverage_requests", {
+export const coverageRequests = pgTable("coverage_requests", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   shiftId: text("shift_id").notNull(),
   reason: text("reason").notNull().default(""),
   status: text("status").notNull().default("open"),
   acceptedByUserId: text("accepted_by_user_id"),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
-export const coverageCandidates = sqliteTable("coverage_candidates", {
+export const coverageCandidates = pgTable("coverage_candidates", {
   id: text("id").primaryKey(),
   requestId: text("request_id").notNull(),
   userId: text("user_id").notNull(),
@@ -107,7 +106,7 @@ export const coverageCandidates = sqliteTable("coverage_candidates", {
   status: text("status").notNull().default("invited"),
 });
 
-export const dailyTasks = sqliteTable("daily_tasks", {
+export const dailyTasks = pgTable("daily_tasks", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   locationId: text("location_id").notNull(),
@@ -119,7 +118,7 @@ export const dailyTasks = sqliteTable("daily_tasks", {
   completed: integer("completed").notNull().default(0),
 });
 
-export const attendance = sqliteTable("attendance", {
+export const attendance = pgTable("attendance", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull(),
   shiftId: text("shift_id"),
@@ -127,10 +126,10 @@ export const attendance = sqliteTable("attendance", {
   checkInAt: text("check_in_at"),
   checkOutAt: text("check_out_at"),
   autoCheckout: integer("auto_checkout").notNull().default(0),
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
-export const permissions = sqliteTable("permissions", {
+export const permissions = pgTable("permissions", {
   orgId: text("org_id").primaryKey(),
   approveLeave: integer("approve_leave").notNull().default(1),
   moveEmployees: integer("move_employees").notNull().default(1),

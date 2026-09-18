@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureSchema } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword, setSessionCookie } from "@/lib/auth";
 import { badRequest } from "@/lib/api";
 
 export async function POST(request: NextRequest) {
+  await ensureSchema();
   const body = await request.json().catch(() => null);
   const email = body?.email?.trim()?.toLowerCase();
   const password = body?.password;

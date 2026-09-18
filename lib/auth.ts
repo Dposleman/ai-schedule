@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import { db } from "@/db";
+import { db, ensureSchema } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { SESSION_COOKIE_NAME as COOKIE_NAME } from "@/lib/session-cookie";
@@ -60,6 +60,7 @@ export async function clearSessionCookie() {
 }
 
 export async function getCurrentUser() {
+  await ensureSchema();
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   const userId = parseSessionToken(token);
