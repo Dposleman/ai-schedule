@@ -2,36 +2,56 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error(
-    "Falta la variable de entorno DATABASE_URL. Define la cadena de conexión a tu base de datos Postgres (Neon, Vercel Postgres, Supabase, etc.)."
-  );
-}
-
 declare global {
   // eslint-disable-next-line no-var
   var __aiSchedulePool: Pool | undefined;
+  // eslint-disable-next-line no-var
+  var __aiScheduleDb: ReturnType<typeof drizzle<typeof schema>> | undefined;
 }
 
-// Reuse the pool across hot reloads / warm serverless invocations instead of
-// opening a new connection on every request.
-const pool =
-  globalThis.__aiSchedulePool ??
-  new Pool({
+// Lazy: the pool/connection is only created the first time a query actually
+// runs, not at module import time. This avoids crashing `next build` (which
+// imports every route module to collect its metadata) when DATABASE_URL
+// isn't set yet at build time.
+function getPool() {
+  if (globalThis.__aiSchedulePool) return globalThis.__aiSchedulePool;
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "Falta la variable de entorno DATABASE_URL. Define la cadena de conexión a tu base de datos Postgres (Neon, Vercel Postgres, Supabase, etc.)."
+    );
+  }
+
+  const pool = new Pool({
     connectionString,
     ssl: connectionString.includes("localhost") || connectionString.includes("127.0.0.1") ? false : { rejectUnauthorized: false },
     max: process.env.VERCEL ? 1 : 10,
   });
-if (!globalThis.__aiSchedulePool) globalThis.__aiSchedulePool = pool;
+  globalThis.__aiSchedulePool = pool;
+  return pool;
+}
 
-export const db = drizzle(pool, { schema });
+function getDb() {
+  if (!globalThis.__aiScheduleDb) {
+    globalThis.__aiScheduleDb = drizzle(getPool(), { schema });
+  }
+  return globalThis.__aiScheduleDb;
+}
+
+// Proxy so existing call sites (`db.select()...`) keep working unchanged,
+// while the real connection is only made lazily on first use.
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getDb(), prop, receiver);
+  },
+});
 
 let migrated = false;
 export async function ensureSchema() {
   if (migrated) return;
   migrated = true;
-  await pool.query(`
+  await getPool().query(`
     CREATE TABLE IF NOT EXISTS organizations (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

@@ -60,11 +60,14 @@ export async function clearSessionCookie() {
 }
 
 export async function getCurrentUser() {
-  await ensureSchema();
+  // Read the (dynamic) cookie first so Next.js opts this route out of static
+  // prerendering before we ever touch the database — otherwise the build-time
+  // static pass would fail if DATABASE_URL isn't available at build time.
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   const userId = parseSessionToken(token);
   if (!userId) return null;
+  await ensureSchema();
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return null;
   return user;
