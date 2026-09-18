@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AI Schedule</string>
+    <string name="title_activity_main">AI Schedule</string>
+    <string name="package_name">com.aischedule.mobile</string>
+    <string name="custom_url_scheme">com.aischedule.mobile</string>
+</resources>

@@ -1,0 +1,22 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { shifts } from "@/db/schema";
+import { and, eq, gte, lte } from "drizzle-orm";
+import { requireUser, requireRole, badRequest } from "@/lib/api";
+
+export async function POST(request: NextRequest) {
+  const { user, error } = await requireUser();
+  if (error) return error;
+  const permissionError = requireRole(user, ["owner", "manager"]);
+  if (permissionError) return permissionError;
+
+  const body = await request.json().catch(() => ({}));
+  if (!body?.weekStart || !body?.weekEnd) return badRequest("Falta el rango de la semana.");
+
+  await db
+    .update(shifts)
+    .set({ published: 1 })
+    .where(and(eq(shifts.orgId, user.orgId), gte(shifts.date, body.weekStart), lte(shifts.date, body.weekEnd)));
+
+  return NextResponse.json({ ok: true });
+}
