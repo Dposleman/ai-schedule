@@ -125,7 +125,11 @@ button { color: inherit; font: inherit; }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .main-nav button:focus-visible, .primary-button:focus-visible, .secondary-button:focus-visible { outline-offset: -2px; }
 
-:root[data-theme="dark"] { color-scheme: dark; --ink: #f2f2f1; --muted: #a7abaf; --muted-soft: #7e8286; --line: #33373a; --surface: #232627; --canvas: #17191a; --accent: #4fbaac; --accent-mid: #6bcbbe; --accent-dark: #86d8cd; --accent-soft: #1c3330; }
+/* Dark-mode accent is a lighter navy-blue (not the old teal) so the primary
+   color stays recognizably Harbor Navy in both themes — dark enough in
+   light mode to read as navy, light enough here to stay visible on a
+   near-black canvas. */
+:root[data-theme="dark"] { color-scheme: dark; --ink: #f2f2f1; --muted: #a7abaf; --muted-soft: #7e8286; --line: #33373a; --surface: #232627; --canvas: #17191a; --accent: #3B6EA5; --accent-mid: #4A7EB8; --accent-dark: #2C557E; --accent-soft: #1B2A3D; }
 :root[data-theme="dark"] .sidebar, :root[data-theme="dark"] .topbar, :root[data-theme="dark"] article, :root[data-theme="dark"] aside:not(.sidebar), :root[data-theme="dark"] .data-card, :root[data-theme="dark"] .location-trigger, :root[data-theme="dark"] .location-menu, :root[data-theme="dark"] .icon-button, :root[data-theme="dark"] .secondary-button, :root[data-theme="dark"] .ai-modal, :root[data-theme="dark"] .chat-head, :root[data-theme="dark"] .notif-menu { background-color: var(--surface); color: var(--ink); }
 /* Sidebar stays navy in dark mode too — it was already the one fixed-dark
    panel in the shell (see --sidebar-bg above), so there's nothing to flip. */
