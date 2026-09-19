@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { distanceInMeters } from "@/lib/geo";
 import {
   AlertTriangle, ArrowLeftRight, ArrowUpRight, Banknote, Bot, Building2, Crown, CalendarDays,
-  CalendarX2, Check, CheckCircle2, ClipboardCheck, Clock3, FileCheck2, Fingerprint, LockKeyhole,
+  CalendarX2, Check, CheckCircle2, ClipboardCheck, Clock3, CreditCard, FileCheck2, Fingerprint, History, LockKeyhole,
   Image as ImageIcon, Mail, MapPin, Phone, ReceiptText, Search, Send, ShieldCheck, Sparkles, Store,
   Trash2, Umbrella, UserPlus, UserCheck, UsersRound, WandSparkles, X,
 } from "lucide-react";
@@ -15,7 +15,7 @@ import { useLanguage } from "@/app/language-context";
 import { LANGUAGES } from "@/lib/i18n";
 import type {
   CurrentUser, LocationT, OrgT, EmployeeT, ShiftT, AbsenceT, TransferT, TaskT,
-  CoverageRequestT, PermissionsT, OpenAttendanceT, TodayAttendanceT,
+  CoverageRequestT, PermissionsT, OpenAttendanceT, TodayAttendanceT, AuditEventT, BillingT,
 } from "@/lib/view-types";
 
 // Resizes/re-encodes an uploaded image client-side before it goes anywhere
@@ -983,6 +983,138 @@ export function SettingsView({ permissions, onToggle, organization, locations, o
           ))}
           {logoError && <p className="logo-upload-error"><AlertTriangle size={13} /> {logoError}</p>}
         </article>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Billing ---------------- */
+export function BillingView({ employees, locations, onError }: { employees: EmployeeT[]; locations: LocationT[]; onError: (error: unknown) => void }) {
+  const { t, locale } = useLanguage();
+  const [billing, setBilling] = useState<BillingT | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    apiFetch("/api/billing").then((r) => r.json()).then((data) => { setBilling(data); setLoaded(true); }).catch((e) => { onError(e); setLoaded(true); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!loaded) return <div className="empty-state">{t("common.loading")}</div>;
+  if (!billing) return <div className="empty-state">{t("billing.loadError")}</div>;
+
+  const seatsUsed = employees.length;
+  const locationsUsed = locations.length;
+  const trialDaysLeft = Math.max(0, Math.ceil((new Date(billing.trialEndsAt).getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000)));
+
+  const statusLabel = billing.isRestricted
+    ? t("billing.status.restricted")
+    : billing.subscriptionStatus === "trialing"
+      ? t("billing.status.trialing", { count: trialDaysLeft })
+      : billing.subscriptionStatus === "active"
+        ? t("billing.status.active")
+        : billing.subscriptionStatus;
+
+  return (
+    <div className="view-stack">
+      <div className="view-heading"><div><span className="view-kicker">{t("billing.kicker")}</span><h2>{billing.plan.name}</h2><p>{statusLabel}</p></div></div>
+
+      {billing.isRestricted && (
+        <div className="banner-error"><AlertTriangle size={16} /> {t("billing.restrictedNotice")}</div>
+      )}
+
+      <section className="transfer-summary-grid">
+        <article><span className="summary-icon violet"><UsersRound size={18} /></span><div><small>{t("billing.seats")}</small><strong>{seatsUsed} / {billing.seatLimit}</strong><p>{t("billing.seatsDetail")}</p></div></article>
+        <article><span className="summary-icon green"><Store size={18} /></span><div><small>{t("billing.locations")}</small><strong>{locationsUsed} / {billing.locationLimit}</strong><p>{t("billing.locationsDetail")}</p></div></article>
+        <article><span className="summary-icon orange"><CreditCard size={18} /></span><div><small>{t("billing.price")}</small><strong>{billing.plan.priceMonthlyCents == null ? t("billing.notPriced") : money(billing.plan.priceMonthlyCents, locale)}</strong><p>{billing.plan.positioning}</p></div></article>
+      </section>
+
+      <article className="data-card">
+        <div className="card-heading"><div><h3>{t("billing.plans")}</h3><p>{t("billing.plansSubtitle")}</p></div></div>
+        {billing.catalog.map((plan) => (
+          <div className="permission-row" key={plan.key}>
+            <div><strong>{plan.name}{plan.key === billing.planKey && <em className="status-pill available" style={{ marginLeft: 8 }}>{t("billing.currentPlan")}</em>}</strong><span>{plan.positioning}</span></div>
+            <span>{t("billing.limitsSummary", { seats: plan.seatLimit >= 9999 ? "∞" : String(plan.seatLimit), locations: plan.locationLimit >= 9999 ? "∞" : String(plan.locationLimit) })}</span>
+          </div>
+        ))}
+      </article>
+
+      <p className="preview-note">{t("billing.notConnectedNote")}</p>
+    </div>
+  );
+}
+
+/* ---------------- Audit log ---------------- */
+function auditActionLabel(t: (key: string) => string, action: string) {
+  const key = `audit.action.${action}`;
+  const translated = t(key);
+  return translated === key ? action : translated;
+}
+
+export function AuditLogView({ employees, onError }: { employees: EmployeeT[]; onError: (error: unknown) => void }) {
+  const { t, locale } = useLanguage();
+  const [events, setEvents] = useState<AuditEventT[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    apiFetch("/api/audit").then((r) => r.json()).then((data) => { setEvents(data.events ?? []); setLoaded(true); }).catch((e) => { onError(e); setLoaded(true); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadMore = async () => {
+    const oldest = events[events.length - 1];
+    if (!oldest) return;
+    setLoadingMore(true);
+    try {
+      const res = await apiFetch(`/api/audit?before=${encodeURIComponent(oldest.createdAt.slice(0, 10))}`);
+      const data = await res.json();
+      setEvents((prev) => [...prev, ...(data.events ?? [])]);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const filtered = events.filter((e) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return e.actorName.toLowerCase().includes(q) || e.action.toLowerCase().includes(q) || e.entityType.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="view-stack">
+      <div className="view-heading"><div><span className="view-kicker">{t("audit.kicker")}</span><h2>{t("audit.title")}</h2><p>{t("audit.subtitle")}</p></div></div>
+
+      <div className="directory-search" style={{ width: "100%", maxWidth: 340 }}>
+        <Search size={15} /><input placeholder={t("audit.searchPlaceholder")} value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
+
+      <article className="data-card">
+        {!loaded ? (
+          <div className="empty-state">{t("common.loading")}</div>
+        ) : filtered.length === 0 ? (
+          <div className="empty-state">{t("audit.empty")}</div>
+        ) : (
+          <div className="timeline-list">
+            {filtered.map((event) => {
+              const actor = employees.find((e) => e.id === event.actorUserId);
+              return (
+                <div className="timeline-step active" key={event.id}>
+                  <i><History size={12} /></i>
+                  <div>
+                    <strong>{(actor?.name ?? event.actorName) || t("audit.systemActor")} · {auditActionLabel(t, event.action)}</strong>
+                    <small title={event.createdAt}>{event.entityType} {event.entityId ? `· ${event.entityId.slice(0, 10)}` : ""} · {new Date(event.createdAt).toLocaleString(locale)}</small>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </article>
+      {events.length > 0 && events.length % 100 === 0 && (
+        <button className="secondary-button" disabled={loadingMore} onClick={loadMore}>{loadingMore ? t("common.loading") : t("audit.loadMore")}</button>
       )}
     </div>
   );

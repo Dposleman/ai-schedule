@@ -54,3 +54,19 @@ export type OpenAttendanceT = { id: string; checkInAt: string; checkOutAt: strin
 // panel. shiftId is null for a clock-in that wasn't tied to a scheduled
 // shift (see app/api/attendance/route.ts).
 export type TodayAttendanceT = { id: string; userId: string; shiftId: string | null; checkInAt: string | null; checkOutAt: string | null };
+
+// GET /api/audit — owner-only (see lib/audit.ts for the AuditAction union).
+// actorUserId is null for a system-triggered event (a cron job).
+export type AuditEventT = {
+  id: string; actorUserId: string | null; actorName: string; action: string;
+  entityType: string; entityId: string; metadata: Record<string, unknown>; createdAt: string;
+};
+
+// GET /api/billing (see lib/billing.ts / lib/plans.ts).
+export type BillingT = {
+  planKey: string; subscriptionStatus: string; trialEndsAt: string;
+  currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; gracePeriodEndsAt: string | null;
+  seatLimit: number; locationLimit: number; isTrialExpired: boolean; isRestricted: boolean;
+  plan: { key: string; name: string; locationLimit: number; seatLimit: number; priceMonthlyCents: number | null; positioning: string };
+  catalog: { key: string; name: string; locationLimit: number; seatLimit: number; priceMonthlyCents: number | null; positioning: string }[];
+};

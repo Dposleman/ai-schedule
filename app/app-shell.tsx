@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import {
   AlertTriangle, ArrowLeftRight, ArrowUpRight, Bell, Banknote, Building2, CalendarDays,
-  Check, ChevronDown, Clock3, ClipboardCheck, Fingerprint,
+  Check, ChevronDown, Clock3, ClipboardCheck, Fingerprint, History,
   LayoutDashboard, LoaderCircle, LogOut, MessageCircle,
   Moon, Settings2, ShieldCheck, Sparkles, Store, Sun, Umbrella,
   UserCheck, UsersRound, WandSparkles, X,
@@ -16,7 +16,7 @@ import { LanguageSwitcher } from "@/app/language-switcher";
 import {
   ResumenView, MyShiftView, PlannerView, TimeTrackingView, DailyOperationsView, CostsView,
   TeamView, TransfersView, MyAbsencesView, AbsencesView, ChatView, StaffDirectoryView,
-  LocationsView, AccountsView, SettingsView, TransferModal,
+  LocationsView, AccountsView, SettingsView, BillingView, AuditLogView, TransferModal,
 } from "@/app/app-shell-views";
 import type {
   CurrentUser, LocationT, OrgT, EmployeeT, ShiftT, AbsenceT, TransferT, TaskT,
@@ -25,7 +25,8 @@ import type {
 
 type NavKey =
   | "resumen" | "myshift" | "planner" | "timetracking" | "dailyops" | "costs" | "team"
-  | "transfers" | "absences" | "chat" | "staff" | "locations" | "accounts" | "settings";
+  | "transfers" | "absences" | "chat" | "staff" | "locations" | "accounts" | "settings"
+  | "billing" | "auditlog";
 
 const AVATAR_COLORS = ["blue", "green", "orange", "pink", "lilac"];
 
@@ -292,8 +293,16 @@ export default function AppShell({
             );
           })}
           {currentUser.role !== "employee" && (
-            <><p className="nav-label nav-label-second">{t("nav.section.system")}</p>
-            <button className={activeNav === "settings" ? "active" : ""} onClick={() => setActiveNav("settings")}><Settings2 size={18} /><span>{t("nav.settings")}</span></button></>
+            <>
+              <p className="nav-label nav-label-second">{t("nav.section.system")}</p>
+              <button className={activeNav === "settings" ? "active" : ""} onClick={() => setActiveNav("settings")}><Settings2 size={18} /><span>{t("nav.settings")}</span></button>
+              {currentUser.role === "owner" && (
+                <>
+                  <button className={activeNav === "billing" ? "active" : ""} onClick={() => setActiveNav("billing")}><Banknote size={18} /><span>{t("nav.billing")}</span></button>
+                  <button className={activeNav === "auditlog" ? "active" : ""} onClick={() => setActiveNav("auditlog")}><History size={18} /><span>{t("nav.auditlog")}</span></button>
+                </>
+              )}
+            </>
           )}
         </nav>
 
@@ -312,7 +321,7 @@ export default function AppShell({
 
       <section className="workspace">
         <header className="topbar">
-          <div><p>{new Date().toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}</p><h1>{activeNav === "resumen" ? t("shell.hello", { name: currentUser.name.split(" ")[0] }) : t(availableNav.find((n) => n.key === activeNav)?.labelKey ?? (activeNav === "settings" ? "nav.settings" : "nav.resumen"))}</h1></div>
+          <div><p>{new Date().toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}</p><h1>{activeNav === "resumen" ? t("shell.hello", { name: currentUser.name.split(" ")[0] }) : t(availableNav.find((n) => n.key === activeNav)?.labelKey ?? (activeNav === "settings" ? "nav.settings" : activeNav === "billing" ? "nav.billing" : activeNav === "auditlog" ? "nav.auditlog" : "nav.resumen"))}</h1></div>
           <div className="topbar-actions">
             <button className="icon-button" onClick={toggleTheme} aria-label={theme === "light" ? t("shell.darkTheme") : t("shell.lightTheme")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
             <div className="notif-wrap">
@@ -401,6 +410,8 @@ export default function AppShell({
                   onUpdateLocationLogo={async (locationId: string, logoUrl: string | null) => { try { await api(`/api/locations/${locationId}`, { method: "PATCH", body: JSON.stringify({ logoUrl }) }); await loadAll(); } catch (e) { fail(e); } }}
                 />
               )}
+              {activeNav === "billing" && currentUser.role === "owner" && <BillingView employees={employees} locations={locations} onError={fail} />}
+              {activeNav === "auditlog" && currentUser.role === "owner" && <AuditLogView employees={employees} onError={fail} />}
             </>
           )}
         </div>
