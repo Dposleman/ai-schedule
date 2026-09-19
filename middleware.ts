@@ -133,11 +133,17 @@ export function middleware(request: NextRequest) {
     url.pathname = "/login";
     return securityHeaders(NextResponse.redirect(url), csp, isProd);
   }
-  if (isPublic && hasSession) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return securityHeaders(NextResponse.redirect(url), csp, isProd);
-  }
+  // NOTE: deliberately no "isPublic && hasSession -> redirect to /" shortcut
+  // here. A cookie merely being present doesn't mean it's a *valid* session
+  // (see db/schema.ts sessions table / lib/auth.ts getCurrentUser) — only a
+  // DB lookup can tell, and middleware doesn't do one for cost reasons. The
+  // root page (app/page.tsx) already does that real check server-side and
+  // redirect()s to /login when the session doesn't verify. Redirecting away
+  // from /login on cookie presence alone created an infinite loop for any
+  // stale/invalid cookie: page.tsx sends / -> /login (no valid session),
+  // this block sent /login -> / (cookie present), forever. A genuinely
+  // logged-in user who navigates to /login by hand just sees the login
+  // page, harmless compared to that.
 
   const response = NextResponse.next();
   return securityHeaders(response, csp, isProd);
