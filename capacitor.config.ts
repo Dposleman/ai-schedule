@@ -8,7 +8,8 @@ const config: CapacitorConfig = {
   appName: "UnderStack Shift",
   webDir: "mobile-dist",
   android: {
-    backgroundColor: "#F4F3F0",
+    // Matches the new --canvas token (Harbor Navy palette, Phase 9).
+    backgroundColor: "#F5F6F8",
   },
   plugins: {
     SystemBars: {

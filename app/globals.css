@@ -1,21 +1,36 @@
 @import "tailwindcss";
 
+/* "Harbor Navy" — the palette the owner picked from the 5 options presented
+   for Phase 9 (master prompt's mandatory palette-selection gate). This is
+   step 1 of the redesign: core tokens + the app shell (sidebar/nav/topbar/
+   buttons). The rest of Phase 9 (full screen-by-screen redesign, IA
+   restructure, tokenized spacing/typography/shadows, WCAG audit) is tracked
+   separately — see the project doc — rather than rewritten blind in one
+   pass without a way to visually verify every screen first. */
 :root {
-  --ink: #23272B;
-  --muted: #6b7078;
-  --muted-soft: #9aa0a8;
-  --line: #e3e5e8;
+  --ink: #101828;
+  --muted: #5B6472;
+  --muted-soft: #8b93a0;
+  --line: #DDE1E7;
   --surface: #ffffff;
-  --canvas: #F4F3F0;
-  --accent: #2f9e8f;
-  --accent-dark: #267f73;
-  --accent-mid: #36b6a4;
-  --accent-soft: #f0f5f4;
-  --green: #4c9a6a;
+  --canvas: #F5F6F8;
+  --accent: #1E3A5F;
+  --accent-dark: #16293F;
+  --accent-mid: #2c5580;
+  --accent-soft: #EDF1F6;
+  --green: #1F8A5F;
+  --gold: #C9A227;
+  --danger: #C0342C;
+  --warning: #B7791F;
+  --focus-ring: #3B6EA5;
+  --sidebar-bg: #10233B;
+  --sidebar-ink: #ffffff;
+  --sidebar-muted: #93A0B4;
+  --sidebar-active-bg: #1E3A5F;
   /* Fixed dark panel background — used for the hero/highlight cards that are
      always dark-on-white text, regardless of light/dark theme. --ink itself
      flips to a light color in dark mode, so it can't be reused here. */
-  --panel-ink: #23272B;
+  --panel-ink: #10233B;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: ui-serif, Charter, "Source Serif Pro", Georgia, "Times New Roman", serif;
 }
@@ -26,48 +41,48 @@ body { margin: 0; background: var(--canvas); color: var(--ink); font-family: var
 button { color: inherit; font: inherit; }
 .app-shell { min-height: 100vh; background: var(--canvas); }
 
-.sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; width: 242px; flex-direction: column; border-right: 1px solid var(--line); background: #fbfdfd; padding: 25px 15px 18px; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 23px; font-family: var(--font-display), sans-serif; font-size: 21px; font-weight: 800; letter-spacing: -.6px; }
-.brand-mark { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 8px; background: var(--accent); color: white; overflow: hidden; }
+.sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; width: 242px; flex-direction: column; background: var(--sidebar-bg); padding: 25px 15px 18px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 23px; font-family: var(--font-display), sans-serif; font-size: 21px; font-weight: 800; letter-spacing: -.6px; color: var(--sidebar-ink); }
+.brand-mark { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 8px; background: var(--gold); color: var(--sidebar-bg); overflow: hidden; }
 .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
 .location-picker { position: relative; }
-.location-trigger { display: flex; width: 100%; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 10px; background: white; padding: 10px; text-align: left; cursor: pointer; }
-.location-trigger > svg { flex: 0 0 auto; color: #9e9e9e; transition: transform .2s ease; }
+.location-trigger { display: flex; width: 100%; align-items: center; gap: 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.06); padding: 10px; text-align: left; cursor: pointer; }
+.location-trigger > svg { flex: 0 0 auto; color: var(--sidebar-muted); transition: transform .2s ease; }
 .location-trigger > svg.rotate { transform: rotate(180deg); }
-.location-symbol { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: #f0f7f6; color: var(--accent); overflow: hidden; }
+.location-symbol { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: rgba(255,255,255,.1); color: var(--sidebar-ink); overflow: hidden; }
 .location-symbol img { width: 100%; height: 100%; object-fit: cover; }
 .location-copy { min-width: 0; flex: 1; }
 .location-copy small, .location-copy strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.location-copy small { margin-bottom: 2px; color: #a0a0a0; font-size: 13.5px; text-transform: uppercase; letter-spacing: .04em; }
-.location-copy strong { font-size: 15.5px; font-weight: 700; }
-.location-menu { position: absolute; top: calc(100% + 7px); left: 0; z-index: 50; width: 100%; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: white; padding: 5px; box-shadow: 0 16px 36px rgba(28, 25, 60, .13); }
+.location-copy small { margin-bottom: 2px; color: var(--sidebar-muted); font-size: 13.5px; text-transform: uppercase; letter-spacing: .04em; }
+.location-copy strong { font-size: 15.5px; font-weight: 700; color: var(--sidebar-ink); }
+.location-menu { position: absolute; top: calc(100% + 7px); left: 0; z-index: 50; width: 100%; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: white; padding: 5px; box-shadow: 0 16px 36px rgba(16, 35, 59, .22); }
 .location-menu button { display: flex; width: 100%; align-items: center; justify-content: space-between; border: 0; border-radius: 9px; background: transparent; padding: 8px 9px; text-align: left; cursor: pointer; }
-.location-menu button:hover, .location-menu button.selected { background: #f5fdfc; }
+.location-menu button:hover, .location-menu button.selected { background: var(--accent-soft); }
 .location-menu span strong, .location-menu span small { display: block; }
 .location-menu span strong { font-size: 14.5px; }
 .location-menu span small { margin-top: 2px; color: var(--muted); font-size: 13.5px; }
 .location-menu svg { color: var(--accent); }
 .main-nav { margin-top: 22px; }
-.nav-label { margin: 0 10px 7px; color: #b2b2b2; font-size: 13.5px; font-weight: 800; letter-spacing: .12em; }
+.nav-label { margin: 0 10px 7px; color: var(--sidebar-muted); font-size: 13.5px; font-weight: 800; letter-spacing: .12em; }
 .nav-label-second { margin-top: 20px; }
-.main-nav button { position: relative; display: flex; width: 100%; align-items: center; gap: 11px; border: 0; border-radius: 10px; background: transparent; padding: 9px 11px; color: #787878; font-size: 15.5px; font-weight: 600; cursor: pointer; }
-.main-nav button:hover { background: #f2f7f6; color: var(--ink); }
-.main-nav button.active { background: var(--accent-soft); color: var(--accent-dark); }
-.main-nav button.active::before { position: absolute; left: -15px; width: 3px; height: 21px; border-radius: 0 4px 4px 0; background: var(--accent); content: ""; }
-.main-nav button em { display: grid; width: 18px; height: 18px; margin-left: auto; place-items: center; border-radius: 6px; background: #f0f4f3; color: #808080; font-size: 13.5px; font-style: normal; }
-.main-nav button.active em { background: white; color: var(--accent); }
-.ai-status-card { display: flex; align-items: center; gap: 10px; margin-top: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--accent-soft); padding: 11px; }
-.ai-orbit { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; border: 1px solid var(--line); background: white; color: var(--accent); }
-.ai-status-card strong, .ai-status-card span { display: block; }
+.main-nav button { position: relative; display: flex; width: 100%; align-items: center; gap: 11px; border: 0; border-radius: 10px; background: transparent; padding: 9px 11px; color: var(--sidebar-muted); font-size: 15.5px; font-weight: 600; cursor: pointer; }
+.main-nav button:hover { background: rgba(255,255,255,.08); color: var(--sidebar-ink); }
+.main-nav button.active { background: var(--sidebar-active-bg); color: var(--sidebar-ink); }
+.main-nav button.active::before { position: absolute; left: -15px; width: 3px; height: 21px; border-radius: 0 4px 4px 0; background: var(--gold); content: ""; }
+.main-nav button em { display: grid; width: 18px; height: 18px; margin-left: auto; place-items: center; border-radius: 6px; background: rgba(255,255,255,.1); color: var(--sidebar-muted); font-size: 13.5px; font-style: normal; }
+.main-nav button.active em { background: rgba(255,255,255,.16); color: var(--sidebar-ink); }
+.ai-status-card { display: flex; align-items: center; gap: 10px; margin-top: auto; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.06); padding: 11px; }
+.ai-orbit { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.08); color: var(--gold); }
+.ai-status-card strong, .ai-status-card span { display: block; color: var(--sidebar-ink); }
 .ai-status-card strong { font-size: 14px; }
-.ai-status-card span { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: #8d8d8d; font-size: 12.5px; }
-.ai-status-card span i { width: 5px; height: 5px; border-radius: 50%; background: #39b86a; box-shadow: 0 0 0 3px rgba(57, 184, 129, .12); }
-.profile-card { display: flex; align-items: center; gap: 9px; margin-top: 13px; padding: 12px 5px 0; border-top: 1px solid var(--line); }
+.ai-status-card span { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: var(--sidebar-muted); font-size: 12.5px; }
+.ai-status-card span i { width: 5px; height: 5px; border-radius: 50%; background: #39b86a; box-shadow: 0 0 0 3px rgba(57, 184, 129, .18); }
+.profile-card { display: flex; align-items: center; gap: 9px; margin-top: 13px; padding: 12px 5px 0; border-top: 1px solid rgba(255,255,255,.12); }
 .profile-card > div:nth-child(2) { min-width: 0; flex: 1; }
 .profile-card strong, .profile-card span { display: block; }
-.profile-card strong { font-size: 14px; }
-.profile-card span { margin-top: 2px; color: #9e9e9e; font-size: 12.5px; }
-.profile-card button { display: grid; border: 0; background: transparent; color: #a1a1a1; cursor: pointer; }
+.profile-card strong { font-size: 14px; color: var(--sidebar-ink); }
+.profile-card span { margin-top: 2px; color: var(--sidebar-muted); font-size: 12.5px; }
+.profile-card button { display: grid; border: 0; background: transparent; color: var(--sidebar-muted); cursor: pointer; }
 .avatar { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #e9f9f7; color: #3d8279; font-size: 13.5px; font-weight: 800; }
 .avatar-photo { background: #a98668; color: white; }
 .avatar.blue { background: #e3efff; color: #3d73ae; }
@@ -104,9 +119,17 @@ button { color: inherit; font: inherit; }
 .secondary-button { border: 1px solid var(--line); background: white; color: #787878; padding: 7px 10px; }
 .content { padding: 21px 27px 32px; }
 
+/* Visible keyboard focus state (WCAG 2.2 AA) — one consistent ring across
+   every interactive element instead of relying on each browser's default
+   outline, which several of the custom controls above suppress. */
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.main-nav button:focus-visible, .primary-button:focus-visible, .secondary-button:focus-visible { outline-offset: -2px; }
+
 :root[data-theme="dark"] { color-scheme: dark; --ink: #f2f2f1; --muted: #a7abaf; --muted-soft: #7e8286; --line: #33373a; --surface: #232627; --canvas: #17191a; --accent: #4fbaac; --accent-mid: #6bcbbe; --accent-dark: #86d8cd; --accent-soft: #1c3330; }
 :root[data-theme="dark"] .sidebar, :root[data-theme="dark"] .topbar, :root[data-theme="dark"] article, :root[data-theme="dark"] aside:not(.sidebar), :root[data-theme="dark"] .data-card, :root[data-theme="dark"] .location-trigger, :root[data-theme="dark"] .location-menu, :root[data-theme="dark"] .icon-button, :root[data-theme="dark"] .secondary-button, :root[data-theme="dark"] .ai-modal, :root[data-theme="dark"] .chat-head, :root[data-theme="dark"] .notif-menu { background-color: var(--surface); color: var(--ink); }
-:root[data-theme="dark"] .sidebar { background: #1f1f1f; }
+/* Sidebar stays navy in dark mode too — it was already the one fixed-dark
+   panel in the shell (see --sidebar-bg above), so there's nothing to flip. */
+:root[data-theme="dark"] .sidebar { background: var(--sidebar-bg); }
 :root[data-theme="dark"] .topbar { background: rgba(27, 26, 36, .9); }
 :root[data-theme="dark"] .main-nav button:hover, :root[data-theme="dark"] .location-menu button:hover, :root[data-theme="dark"] .location-menu button.selected { background: #373737; }
 :root[data-theme="dark"] input, :root[data-theme="dark"] select { color-scheme: dark; }

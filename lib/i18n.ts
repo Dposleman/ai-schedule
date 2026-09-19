@@ -32,7 +32,7 @@ const en: Dict = {
   "nav.team": "Team",
   "nav.transfers": "Transfers",
   "nav.absences": "Absences",
-  "nav.chat": "Chat",
+  "nav.chat": "Shift Coverage",
   "nav.staff": "Staff",
   "nav.locations": "Locations",
   "nav.accounts": "Accounts",
@@ -279,7 +279,7 @@ const en: Dict = {
   "myabsences.statusPending": "Pending",
 
   // Chat / coverage
-  "chat.kicker": "CHAT & AUTOMATIC COVERAGE",
+  "chat.kicker": "SHIFT COVERAGE & AUTOMATION",
   "chat.title": "Coverage solved without phone calls",
   "chat.subtitle": "The system invites whoever is available; the first to accept gets the shift.",
   "chat.automationActive": "Automation active",
@@ -440,7 +440,7 @@ const da: Dict = {
   "nav.team": "Team",
   "nav.transfers": "Overflytninger",
   "nav.absences": "Fravær",
-  "nav.chat": "Chat",
+  "nav.chat": "Vagtdækning",
   "nav.staff": "Personale",
   "nav.locations": "Lokationer",
   "nav.accounts": "Konti",
@@ -673,7 +673,7 @@ const da: Dict = {
   "myabsences.submit": "Send anmodning",
   "myabsences.statusPending": "Afventer",
 
-  "chat.kicker": "CHAT & AUTOMATISK DÆKNING",
+  "chat.kicker": "VAGTDÆKNING & AUTOMATISERING",
   "chat.title": "Dækning løst uden telefonopkald",
   "chat.subtitle": "Systemet inviterer dem, der er tilgængelige; den første, der accepterer, får vagten.",
   "chat.automationActive": "Automatisering aktiv",
