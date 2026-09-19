@@ -20,7 +20,7 @@ export const POST = withRoute(async (request: NextRequest) => {
   if (error) return badRequest("Enter your email.");
   const { email } = data;
 
-  if (isRateLimited(`forgot:${clientIp(request)}:${email}`, 5, 15 * 60 * 1000)) {
+  if (await isRateLimited(`forgot:${clientIp(request)}:${email}`, 5, 15 * 60 * 1000)) {
     return badRequest("Too many attempts — please wait a few minutes and try again.");
   }
 

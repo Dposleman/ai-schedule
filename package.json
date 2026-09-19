@@ -17,6 +17,8 @@
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/geolocation": "^8.2.2",
+    "@upstash/ratelimit": "^2.1.0",
+    "@upstash/redis": "^1.38.4",
     "bcryptjs": "^2.4.3",
     "drizzle-orm": "0.45.2",
     "lucide-react": "^0.468.0",

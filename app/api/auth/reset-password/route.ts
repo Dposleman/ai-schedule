@@ -19,7 +19,7 @@ export const POST = withRoute(async (request: NextRequest) => {
   if (error) return badRequest("Enter a new password of at least 8 characters.");
   const { token, password } = data;
 
-  if (isRateLimited(`reset:${clientIp(request)}`, 15, 15 * 60 * 1000)) {
+  if (await isRateLimited(`reset:${clientIp(request)}`, 15, 15 * 60 * 1000)) {
     return badRequest("Too many attempts — please wait a few minutes and try again.");
   }
 

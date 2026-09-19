@@ -24,7 +24,7 @@ export const POST = withRoute(async (request: NextRequest) => {
 
   // Limit by IP+email together: generous enough for a real person mistyping
   // their password a few times, tight enough to stop a brute-force script.
-  if (isRateLimited(`login:${clientIp(request)}:${email}`, 10, 5 * 60 * 1000)) {
+  if (await isRateLimited(`login:${clientIp(request)}:${email}`, 10, 5 * 60 * 1000)) {
     return badRequest("Too many attempts — please wait a few minutes and try again.");
   }
 

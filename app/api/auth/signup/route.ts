@@ -27,7 +27,7 @@ export const POST = withRoute(async (request: NextRequest) => {
   if (error) return badRequest("Fill in all fields. The password must be at least 8 characters.");
   const { businessName, name, email, password, locationName } = data;
 
-  if (isRateLimited(`signup:${clientIp(request)}`, 8, 15 * 60 * 1000)) {
+  if (await isRateLimited(`signup:${clientIp(request)}`, 8, 15 * 60 * 1000)) {
     return badRequest("Too many attempts — please wait a few minutes and try again.");
   }
 
