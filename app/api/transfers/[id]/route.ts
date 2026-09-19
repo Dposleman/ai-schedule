@@ -23,9 +23,16 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   if (validationError) return validationError;
   if (data.status === "completed") {
     await db.update(transfers).set({ status: "completed" }).where(eq(transfers.id, id));
-    await db.update(users).set({ currentLocationId: existing.fromLocationId }).where(eq(users.id, existing.userId));
+    // Only a temporary transfer reverts the employee to where they came
+    // from. A permanent transfer's destination *is* their location now —
+    // "completing" it just closes the record, it must never move them back
+    // to fromLocationId.
+    if (existing.type === "temporary") {
+      await db.update(users).set({ currentLocationId: existing.fromLocationId }).where(eq(users.id, existing.userId));
+    }
     await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "transfer.complete", "transfer", id, {
       userId: existing.userId,
+      reverted: existing.type === "temporary",
     });
   }
   return NextResponse.json({ ok: true });

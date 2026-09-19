@@ -1,0 +1,23 @@
+name: Transfer activation check
+
+# Applies any future-dated transfer whose startDate has arrived. Doesn't
+# need to be as frequent as coverage-escalation (that's "did anyone answer
+# within an hour"; this is "did today arrive yet"), so a few times a day is
+# plenty — but still on GitHub Actions rather than Vercel Cron for the same
+# reason as coverage-escalation: the Hobby plan's once-a-day limit doesn't
+# guarantee a transfer activates the same day it's supposed to.
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call transfer-activation endpoint
+        run: |
+          curl -sS -f "https://ai-schedule-alpha.vercel.app/api/cron/transfer-activation" \
+            ${CRON_SECRET:+-H "Authorization: Bearer $CRON_SECRET"}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

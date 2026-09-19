@@ -17,11 +17,17 @@ export type AuditAction =
   | "absence.decide"
   | "transfer.create"
   | "transfer.complete"
+  | "transfer.activate"
   | "shift.update"
   | "shift.delete"
-  | "shift.publish";
+  | "shift.publish"
+  | "schedule.generate"
+  | "coverage.accept";
 
-type AuditActor = { id: string; name: string };
+// id is null for a system-triggered event (a cron job, not a logged-in
+// user) — actorUserId is a nullable FK, so this avoids inserting a fake
+// user id that would just fail the foreign key constraint.
+type AuditActor = { id: string | null; name: string };
 
 /**
  * Appends one row to the audit_events table. Never throws — a failure here

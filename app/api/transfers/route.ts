@@ -47,6 +47,14 @@ export const POST = withRoute(async (request: NextRequest) => {
   if (!destination) return notFound("Location not found.");
 
   const id = newId("transfer");
+  // A future-dated transfer shouldn't move the employee yet — only apply
+  // the location change immediately when it's already in effect (today or
+  // earlier). A future startDate is picked up later by the
+  // transfer-activation cron (app/api/cron/transfer-activation/route.ts),
+  // the same pattern as the coverage-escalation cron.
+  const today = new Date().toISOString().slice(0, 10);
+  const takesEffectNow = data.startDate <= today;
+
   await db.insert(transfers).values({
     id,
     orgId: user.orgId,
@@ -57,20 +65,24 @@ export const POST = withRoute(async (request: NextRequest) => {
     startDate: data.startDate,
     endDate: data.endDate || null,
     status: "active",
+    activatedAt: takesEffectNow ? new Date().toISOString() : null,
   });
 
-  await db
-    .update(users)
-    .set({
-      currentLocationId: data.toLocationId,
-      homeLocationId: data.type === "permanent" ? data.toLocationId : target.homeLocationId,
-    })
-    .where(eq(users.id, data.userId));
+  if (takesEffectNow) {
+    await db
+      .update(users)
+      .set({
+        currentLocationId: data.toLocationId,
+        homeLocationId: data.type === "permanent" ? data.toLocationId : target.homeLocationId,
+      })
+      .where(eq(users.id, data.userId));
+  }
 
   await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "transfer.create", "transfer", id, {
     userId: data.userId,
     toLocationId: data.toLocationId,
     type: data.type,
+    startsImmediately: takesEffectNow,
   });
 
   return NextResponse.json({ ok: true, id });

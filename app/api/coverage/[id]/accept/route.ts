@@ -5,6 +5,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { requireUser, notFound, badRequest, withRoute } from "@/lib/api";
 import { notifyCoverageAccepted } from "@/lib/coverage";
 import { rangesOverlap } from "@/lib/time";
+import { recordAuditEvent } from "@/lib/audit";
 
 type AcceptOutcome =
   | { kind: "not_found" }
@@ -76,6 +77,7 @@ export const POST = withRoute(async (_request: NextRequest, { params }: { params
   if (outcome.kind === "already_taken") return badRequest("This shift has already been assigned.");
   if (outcome.kind === "conflict") return badRequest("You already have a shift that overlaps this time.");
 
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "coverage.accept", "coverage_request", id, {});
   await notifyCoverageAccepted(user.orgId, id, user.id);
   return NextResponse.json({ ok: true });
 });

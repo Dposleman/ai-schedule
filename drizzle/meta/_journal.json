@@ -29,6 +29,13 @@
       "when": 1789809836382,
       "tag": "0003_audit_events",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789851361667,
+      "tag": "0004_operational_hardening",
+      "breakpoints": true
     }
   ]
 }

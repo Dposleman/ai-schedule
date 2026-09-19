@@ -65,6 +65,13 @@ export const POST = withRoute(async (request: NextRequest) => {
       .where(and(eq(locations.id, locationId), eq(locations.orgId, user.orgId)))
       .limit(1);
     if (!site) return badRequest("Location not found.");
+    // A brand-new location defaults to placeholder coordinates until a
+    // manager confirms the real pin (PATCH /api/locations/[id] with both
+    // latitude and longitude sets verified=1) — GPS check-in against an
+    // unconfirmed location would just be validating distance to nowhere.
+    if (!site.verified) {
+      return badRequest(`${site.name} doesn't have a confirmed location yet — ask a manager to set it in Locations before clocking in with GPS.`);
+    }
 
     // If a shift is claimed, bind the check-in to it for real: it must
     // belong to this user, in this org, at this location, and the current

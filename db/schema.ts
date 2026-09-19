@@ -18,6 +18,13 @@ export const locations = pgTable("locations", {
   longitude: doublePrecision("longitude").notNull().default(12.5683),
   radiusMeters: integer("radius_meters").notNull().default(50),
   budgetCents: integer("budget_cents").notNull().default(0),
+  // A newly created location defaults to Copenhagen coordinates (see the
+  // POST handler) until a manager confirms the real address/pin — 0 until
+  // then. GPS clock-in is refused for an unverified location so nobody can
+  // accidentally clock in against a placeholder location on the other side
+  // of the world. Set to 1 whenever latitude/longitude/radiusMeters are
+  // explicitly written via PATCH.
+  verified: integer("verified").notNull().default(0),
   // Data URI, optional — falls back to the org logo when unset.
   logoUrl: text("logo_url"),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
@@ -92,6 +99,11 @@ export const transfers = pgTable("transfers", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date"),
   status: text("status").notNull().default("active"),
+  // Set once the employee's currentLocationId has actually been moved to
+  // toLocationId — immediately at creation for a same-day/past startDate,
+  // or later by the transfer-activation cron once a future startDate
+  // arrives. Null means the move is still pending.
+  activatedAt: timestamp("activated_at", { mode: "string" }),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 

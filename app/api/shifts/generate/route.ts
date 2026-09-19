@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { requireUser, requireCapability, withRoute } from "@/lib/api";
 import { generateWeekSchedule } from "@/lib/scheduler";
 import { parseBody, zDate, zId } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 const generateSchema = z.object({
   weekStart: zDate,
@@ -28,5 +29,10 @@ export const POST = withRoute(async (request: NextRequest) => {
   }
 
   const result = await generateWeekSchedule(user.orgId, data.weekStart, locationIds);
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "schedule.generate", "schedule_week", data.weekStart, {
+    locationIds,
+    created: result.created,
+    open: result.open,
+  });
   return NextResponse.json(result);
 });

@@ -54,6 +54,11 @@ export const POST = withRoute(async (request: NextRequest) => {
     longitude: data.longitude,
     radiusMeters: data.radiusMeters,
     budgetCents: Math.round(data.budget * 100),
+    // Always unverified at creation — even when coordinates were supplied —
+    // so a manager has to deliberately confirm the pin (via PATCH, which
+    // sets verified=1) before GPS clock-in is allowed there. See
+    // app/api/attendance/route.ts.
+    verified: 0,
   });
   await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "location.create", "location", id, {
     name: data.name,

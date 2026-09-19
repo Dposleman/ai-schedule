@@ -37,6 +37,9 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   if (data.latitude !== undefined) patch.latitude = data.latitude;
   if (data.longitude !== undefined) patch.longitude = data.longitude;
   if (data.radiusMeters !== undefined) patch.radiusMeters = data.radiusMeters;
+  // Confirming both coordinates together is what "verifying" this location's
+  // pin means — only then does GPS clock-in unlock for it.
+  if (data.latitude !== undefined && data.longitude !== undefined) patch.verified = 1;
   if (data.budget !== undefined) patch.budgetCents = Math.round(data.budget * 100);
   if (data.logoUrl !== undefined) patch.logoUrl = data.logoUrl;
 
