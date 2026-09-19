@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db, ensureSchema } from "@/db";
 import { users, passwordResetTokens } from "@/db/schema";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { hashPassword, hashResetToken, setSessionCookie, revokeAllSessions } from "@/lib/auth";
 import { badRequest, withRoute } from "@/lib/api";
+import { parseBody } from "@/lib/validation";
 import { isRateLimited, clientIp } from "@/lib/rate-limit";
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1).max(500),
+  password: z.string().min(8, "Enter a new password of at least 8 characters.").max(200),
+});
 
 export const POST = withRoute(async (request: NextRequest) => {
   await ensureSchema();
-  const body = await request.json().catch(() => null);
-  const token = body?.token;
-  const password = body?.password;
-  if (!token || !password || password.length < 8) {
-    return badRequest("Enter a new password of at least 8 characters.");
-  }
+  const { data, error } = await parseBody(request, resetPasswordSchema);
+  if (error) return badRequest("Enter a new password of at least 8 characters.");
+  const { token, password } = data;
 
   if (isRateLimited(`reset:${clientIp(request)}`, 15, 15 * 60 * 1000)) {
     return badRequest("Too many attempts — please wait a few minutes and try again.");

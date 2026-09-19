@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -6,6 +7,7 @@ import { requireUser, requireCapability, badRequest, withRoute } from "@/lib/api
 import { hashPassword, newId } from "@/lib/auth";
 import { sendWelcomeEmail } from "@/lib/email";
 import { organizations } from "@/db/schema";
+import { parseBody, zEmail, zId, zText } from "@/lib/validation";
 import crypto from "node:crypto";
 
 export const GET = withRoute(async () => {
@@ -20,18 +22,27 @@ function tempPassword() {
   return crypto.randomBytes(6).toString("base64url");
 }
 
+const createEmployeeSchema = z.object({
+  name: zText(200),
+  email: zEmail,
+  role: z.enum(["owner", "manager", "employee"]).optional().default("employee"),
+  occupation: z.string().trim().max(100).optional(),
+  phone: z.string().trim().max(50).optional(),
+  locationId: zId.optional(),
+  hourlyRate: z.coerce.number().nonnegative().optional().default(0),
+  weeklyHourTarget: z.coerce.number().nonnegative().optional().default(37),
+});
+
 export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = await requireCapability(user, "employees.manage");
   if (permissionError) return permissionError;
 
-  const body = await request.json().catch(() => null);
-  const name = body?.name?.trim();
-  const email = body?.email?.trim()?.toLowerCase();
-  const role = body?.role === "owner" ? "owner" : body?.role === "manager" ? "manager" : "employee";
+  const { data, error: validationError } = await parseBody(request, createEmployeeSchema);
+  if (validationError) return validationError;
+  const { name, email, role } = data;
 
-  if (!name || !email) return badRequest("Name and email are required.");
   if (role === "owner" && user.role !== "owner") {
     return NextResponse.json({ error: "Only an owner can create another owner." }, { status: 403 });
   }
@@ -49,13 +60,13 @@ export const POST = withRoute(async (request: NextRequest) => {
     email,
     passwordHash: hashPassword(password),
     role,
-    occupation: body?.occupation?.trim() || (role === "manager" ? "Manager" : "Employee"),
-    phone: body?.phone?.trim() || "",
+    occupation: data.occupation || (role === "manager" ? "Manager" : "Employee"),
+    phone: data.phone || "",
     color: colors[Math.floor(Math.random() * colors.length)],
-    homeLocationId: body?.locationId || user.currentLocationId,
-    currentLocationId: body?.locationId || user.currentLocationId,
-    hourlyRateCents: Math.round(Number(body?.hourlyRate) * 100) || 0,
-    weeklyHourTarget: Number(body?.weeklyHourTarget) || 37,
+    homeLocationId: data.locationId || user.currentLocationId,
+    currentLocationId: data.locationId || user.currentLocationId,
+    hourlyRateCents: Math.round(data.hourlyRate * 100),
+    weeklyHourTarget: data.weeklyHourTarget,
   });
 
   const [org] = await db.select().from(organizations).where(eq(organizations.id, user.orgId)).limit(1);

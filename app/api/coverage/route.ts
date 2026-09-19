@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { coverageRequests, coverageCandidates, shifts } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireCapability, badRequest, notFound, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { openCoverageForShift } from "@/lib/coverage";
+import { parseBody, zId } from "@/lib/validation";
 
 export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
@@ -26,16 +28,21 @@ export const GET = withRoute(async () => {
   return NextResponse.json({ requests: enriched });
 });
 
+const requestCoverageSchema = z.object({
+  shiftId: zId,
+  reason: z.string().trim().max(500).optional().default(""),
+});
+
 export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
   const permissionError = await requireCapability(user, "coverage.manage");
   if (permissionError) return permissionError;
 
-  const body = await request.json().catch(() => null);
-  if (!body?.shiftId) return badRequest("Specify which shift needs coverage.");
+  const { data, error: validationError } = await parseBody(request, requestCoverageSchema);
+  if (validationError) return validationError;
 
-  const result = await openCoverageForShift(user.orgId, body.shiftId, body.reason?.trim());
+  const result = await openCoverageForShift(user.orgId, data.shiftId, data.reason);
   if (!result) return notFound("Shift not found.");
 
   return NextResponse.json({ ok: true, id: result.requestId, candidateCount: result.candidateCount });

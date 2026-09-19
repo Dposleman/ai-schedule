@@ -1,23 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db, ensureSchema } from "@/db";
 import { organizations, users, locations, permissions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, newId, setSessionCookie } from "@/lib/auth";
 import { badRequest, withRoute } from "@/lib/api";
+import { parseBody, zEmail, zText } from "@/lib/validation";
 import { isRateLimited, clientIp } from "@/lib/rate-limit";
+
+const signupSchema = z.object({
+  businessName: zText(200),
+  name: zText(200),
+  email: zEmail,
+  password: z.string().min(8, "The password must be at least 8 characters.").max(200),
+  locationName: z
+    .string()
+    .trim()
+    .max(200)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : "Mi primer local")),
+});
 
 export const POST = withRoute(async (request: NextRequest) => {
   await ensureSchema();
-  const body = await request.json().catch(() => null);
-  const businessName = body?.businessName?.trim();
-  const name = body?.name?.trim();
-  const email = body?.email?.trim()?.toLowerCase();
-  const password = body?.password;
-  const locationName = body?.locationName?.trim() || "Mi primer local";
-
-  if (!businessName || !name || !email || !password || password.length < 8) {
-    return badRequest("Fill in all fields. The password must be at least 8 characters.");
-  }
+  const { data, error } = await parseBody(request, signupSchema);
+  if (error) return badRequest("Fill in all fields. The password must be at least 8 characters.");
+  const { businessName, name, email, password, locationName } = data;
 
   if (isRateLimited(`signup:${clientIp(request)}`, 8, 15 * 60 * 1000)) {
     return badRequest("Too many attempts — please wait a few minutes and try again.");

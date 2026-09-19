@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { locations, users, shifts, dailyTasks, transfers } from "@/db/schema";
 import { and, eq, or } from "drizzle-orm";
-import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
+import { parseBody, zDataUriImage } from "@/lib/validation";
 
 const MAX_LOGO_BYTES = 600_000;
+
+const patchLocationSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  address: z.string().trim().max(300).optional(),
+  openHours: z.string().trim().max(100).optional(),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
+  radiusMeters: z.coerce.number().nonnegative().optional(),
+  budget: z.coerce.number().nonnegative().optional(),
+  logoUrl: z.union([zDataUriImage(MAX_LOGO_BYTES), z.null()]).optional(),
+});
 
 export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
@@ -13,23 +26,18 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   const permissionError = await requireCapability(user, "locations.manage");
   if (permissionError) return permissionError;
 
-  const body = await request.json().catch(() => ({}));
+  const { data, error: validationError } = await parseBody(request, patchLocationSchema);
+  if (validationError) return validationError;
+
   const patch: Partial<typeof locations.$inferInsert> = {};
-  if (typeof body.name === "string") patch.name = body.name.trim();
-  if (typeof body.address === "string") patch.address = body.address.trim();
-  if (typeof body.openHours === "string") patch.openHours = body.openHours.trim();
-  if (body.latitude !== undefined) patch.latitude = Number(body.latitude);
-  if (body.longitude !== undefined) patch.longitude = Number(body.longitude);
-  if (body.radiusMeters !== undefined) patch.radiusMeters = Number(body.radiusMeters);
-  if (body.budget !== undefined) patch.budgetCents = Math.round(Number(body.budget) * 100);
-  if (body.logoUrl === null) patch.logoUrl = null;
-  else if (typeof body.logoUrl === "string") {
-    if (!/^data:image\/(png|jpeg|jpg|webp|svg\+xml);base64,/.test(body.logoUrl)) {
-      return badRequest("Logo must be an uploaded image.");
-    }
-    if (body.logoUrl.length > MAX_LOGO_BYTES) return badRequest("That image is too large — try something under ~400KB.");
-    patch.logoUrl = body.logoUrl;
-  }
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.address !== undefined) patch.address = data.address;
+  if (data.openHours !== undefined) patch.openHours = data.openHours;
+  if (data.latitude !== undefined) patch.latitude = data.latitude;
+  if (data.longitude !== undefined) patch.longitude = data.longitude;
+  if (data.radiusMeters !== undefined) patch.radiusMeters = data.radiusMeters;
+  if (data.budget !== undefined) patch.budgetCents = Math.round(data.budget * 100);
+  if (data.logoUrl !== undefined) patch.logoUrl = data.logoUrl;
 
   const [existing] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.orgId, user.orgId))).limit(1);
   if (!existing) return notFound("Location not found.");

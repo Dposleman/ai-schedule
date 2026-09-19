@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, requireCapability, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, withRoute } from "@/lib/api";
+import { parseBody, zDate } from "@/lib/validation";
+
+const publishSchema = z.object({ weekStart: zDate, weekEnd: zDate });
 
 export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
@@ -10,13 +14,13 @@ export const POST = withRoute(async (request: NextRequest) => {
   const permissionError = await requireCapability(user, "schedule.publish");
   if (permissionError) return permissionError;
 
-  const body = await request.json().catch(() => ({}));
-  if (!body?.weekStart || !body?.weekEnd) return badRequest("Missing week range.");
+  const { data, error: validationError } = await parseBody(request, publishSchema);
+  if (validationError) return validationError;
 
   await db
     .update(shifts)
     .set({ published: 1 })
-    .where(and(eq(shifts.orgId, user.orgId), gte(shifts.date, body.weekStart), lte(shifts.date, body.weekEnd)));
+    .where(and(eq(shifts.orgId, user.orgId), gte(shifts.date, data.weekStart), lte(shifts.date, data.weekEnd)));
 
   return NextResponse.json({ ok: true });
 });

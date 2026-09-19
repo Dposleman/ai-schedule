@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import crypto from "node:crypto";
 import { db, ensureSchema } from "@/db";
 import { users, passwordResetTokens } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { hashResetToken, newId } from "@/lib/auth";
 import { badRequest, withRoute } from "@/lib/api";
+import { parseBody, zEmail } from "@/lib/validation";
 import { isRateLimited, clientIp } from "@/lib/rate-limit";
 import { sendPasswordResetEmail } from "@/lib/email";
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+const forgotPasswordSchema = z.object({ email: zEmail });
+
 export const POST = withRoute(async (request: NextRequest) => {
   await ensureSchema();
-  const body = await request.json().catch(() => null);
-  const email = body?.email?.trim()?.toLowerCase();
-  if (!email) return badRequest("Enter your email.");
+  const { data, error } = await parseBody(request, forgotPasswordSchema);
+  if (error) return badRequest("Enter your email.");
+  const { email } = data;
 
   if (isRateLimited(`forgot:${clientIp(request)}:${email}`, 5, 15 * 60 * 1000)) {
     return badRequest("Too many attempts — please wait a few minutes and try again.");

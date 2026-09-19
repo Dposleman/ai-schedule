@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { absenceRequests, shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { openCoverageForShift } from "@/lib/coverage";
 import { notify } from "@/lib/notifications";
+import { parseBody } from "@/lib/validation";
+
+const decideAbsenceSchema = z.object({ status: z.enum(["approved", "rejected"], { error: "Invalid status." }) });
 
 export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
@@ -13,8 +17,8 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   const permissionError = await requireCapability(user, "absences.approve");
   if (permissionError) return permissionError;
 
-  const body = await request.json().catch(() => ({}));
-  if (body.status !== "approved" && body.status !== "rejected") return badRequest("Invalid status.");
+  const { data: body, error: validationError } = await parseBody(request, decideAbsenceSchema);
+  if (validationError) return validationError;
 
   const [existing] = await db.select().from(absenceRequests).where(and(eq(absenceRequests.id, id), eq(absenceRequests.orgId, user.orgId))).limit(1);
   if (!existing) return notFound("Request not found.");

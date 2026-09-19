@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
+import { parseBody, zId } from "@/lib/validation";
+
+const patchEmployeeSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  occupation: z.string().trim().max(100).optional(),
+  phone: z.string().trim().max(50).optional(),
+  currentLocationId: zId.optional(),
+  homeLocationId: zId.optional(),
+  hourlyRate: z.coerce.number().nonnegative().optional(),
+  weeklyHourTarget: z.coerce.number().nonnegative().optional(),
+  role: z.enum(["owner", "manager", "employee"]).optional(),
+});
 
 export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
@@ -21,16 +34,18 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
     }
   }
 
-  const body = await request.json().catch(() => ({}));
+  const { data, error: validationError } = await parseBody(request, patchEmployeeSchema);
+  if (validationError) return validationError;
+
   const patch: Partial<typeof users.$inferInsert> = {};
-  if (typeof body.name === "string") patch.name = body.name.trim();
-  if (typeof body.occupation === "string") patch.occupation = body.occupation.trim();
-  if (typeof body.phone === "string") patch.phone = body.phone.trim();
-  if (typeof body.currentLocationId === "string") patch.currentLocationId = body.currentLocationId;
-  if (typeof body.homeLocationId === "string" && !isSelf) patch.homeLocationId = body.homeLocationId;
-  if (body.hourlyRate !== undefined && !isSelf) patch.hourlyRateCents = Math.round(Number(body.hourlyRate) * 100);
-  if (body.weeklyHourTarget !== undefined && !isSelf) patch.weeklyHourTarget = Number(body.weeklyHourTarget);
-  if (typeof body.role === "string" && user.role === "owner" && !isSelf) patch.role = body.role;
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.occupation !== undefined) patch.occupation = data.occupation;
+  if (data.phone !== undefined) patch.phone = data.phone;
+  if (data.currentLocationId !== undefined) patch.currentLocationId = data.currentLocationId;
+  if (data.homeLocationId !== undefined && !isSelf) patch.homeLocationId = data.homeLocationId;
+  if (data.hourlyRate !== undefined && !isSelf) patch.hourlyRateCents = Math.round(data.hourlyRate * 100);
+  if (data.weeklyHourTarget !== undefined && !isSelf) patch.weeklyHourTarget = data.weeklyHourTarget;
+  if (data.role !== undefined && user.role === "owner" && !isSelf) patch.role = data.role;
 
   await db.update(users).set(patch).where(eq(users.id, id));
   return NextResponse.json({ ok: true });

@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db, ensureSchema } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword, setSessionCookie } from "@/lib/auth";
 import { badRequest, withRoute } from "@/lib/api";
+import { parseBody, zEmail } from "@/lib/validation";
 import { isRateLimited, clientIp } from "@/lib/rate-limit";
+
+const loginSchema = z.object({
+  email: zEmail,
+  // Not validated for shape/length here (unlike signup) — a login attempt
+  // has to reach verifyPassword() and fail there no matter what was typed,
+  // so the error message doesn't leak which part of the login was wrong.
+  password: z.string().min(1, "Enter your email and password."),
+});
 
 export const POST = withRoute(async (request: NextRequest) => {
   await ensureSchema();
-  const body = await request.json().catch(() => null);
-  const email = body?.email?.trim()?.toLowerCase();
-  const password = body?.password;
-  if (!email || !password) return badRequest("Enter your email and password.");
+  const { data, error } = await parseBody(request, loginSchema);
+  if (error) return badRequest("Enter your email and password.");
+  const { email, password } = data;
 
   // Limit by IP+email together: generous enough for a real person mistyping
   // their password a few times, tight enough to stop a brute-force script.

@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { locations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireCapability, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
+import { parseBody, zText } from "@/lib/validation";
+
+const numberOr = (fallback: number) => z.coerce.number().optional().transform((value) => (value === undefined || Number.isNaN(value) ? fallback : value));
+
+const createLocationSchema = z.object({
+  name: zText(200),
+  address: z.string().trim().max(300).optional().default(""),
+  openHours: z.string().trim().max(100).optional().transform((v) => (v && v.length > 0 ? v : "08:00–23:00")),
+  latitude: numberOr(55.6761),
+  longitude: numberOr(12.5683),
+  radiusMeters: numberOr(50),
+  budget: numberOr(0),
+});
 
 export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
@@ -18,20 +32,20 @@ export const POST = withRoute(async (request: NextRequest) => {
   const permissionError = await requireCapability(user, "locations.manage");
   if (permissionError) return permissionError;
 
-  const body = await request.json().catch(() => null);
-  if (!body?.name?.trim()) return badRequest("The location needs a name.");
+  const { data, error: validationError } = await parseBody(request, createLocationSchema);
+  if (validationError) return validationError;
 
   const id = newId("loc");
   await db.insert(locations).values({
     id,
     orgId: user.orgId,
-    name: body.name.trim(),
-    address: body.address?.trim() || "",
-    openHours: body.openHours?.trim() || "08:00–23:00",
-    latitude: Number(body.latitude) || 55.6761,
-    longitude: Number(body.longitude) || 12.5683,
-    radiusMeters: Number(body.radiusMeters) || 50,
-    budgetCents: Math.round(Number(body.budget) * 100) || 0,
+    name: data.name,
+    address: data.address,
+    openHours: data.openHours,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    radiusMeters: data.radiusMeters,
+    budgetCents: Math.round(data.budget * 100),
   });
   return NextResponse.json({ ok: true, id });
 });

@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { shifts } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
+import { parseBody, zId, zTime } from "@/lib/validation";
 
 function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return aStart < bEnd && bStart < aEnd;
 }
+
+const patchShiftSchema = z.object({
+  // Explicitly nullable (not just optional): the client sends userId: null
+  // to unassign a shift, which is different from omitting the field.
+  userId: z.union([zId, z.null()]).optional(),
+  startTime: zTime.optional(),
+  endTime: zTime.optional(),
+  role: z.string().trim().max(100).optional(),
+  force: z.boolean().optional(),
+});
 
 export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
@@ -16,7 +28,8 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   const [existing] = await db.select().from(shifts).where(and(eq(shifts.id, id), eq(shifts.orgId, user.orgId))).limit(1);
   if (!existing) return notFound("Shift not found.");
 
-  const body = await request.json().catch(() => ({}));
+  const { data: body, error: validationError } = await parseBody(request, patchShiftSchema);
+  if (validationError) return validationError;
 
   // Once published, editing it is gated by the org's "Edit published
   // schedules" toggle rather than the baseline schedule.edit a manager
@@ -34,9 +47,9 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
     patch.userId = body.userId || null;
     patch.status = body.userId ? "scheduled" : "open";
   }
-  if (typeof body.startTime === "string") patch.startTime = body.startTime;
-  if (typeof body.endTime === "string") patch.endTime = body.endTime;
-  if (typeof body.role === "string") patch.role = body.role;
+  if (body.startTime !== undefined) patch.startTime = body.startTime;
+  if (body.endTime !== undefined) patch.endTime = body.endTime;
+  if (body.role !== undefined) patch.role = body.role;
 
   // Warn instead of silently double-booking: if this assigns (or re-times)
   // a shift for someone, make sure it doesn't overlap another shift they're

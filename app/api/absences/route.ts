@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/db";
 import { absenceRequests, shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, badRequest, withRoute } from "@/lib/api";
+import { requireUser, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { openCoverageForShift } from "@/lib/coverage";
 import { notifyMany, managersOf } from "@/lib/notifications";
+import { parseBody, zDate } from "@/lib/validation";
 
 export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
@@ -15,14 +17,21 @@ export const GET = withRoute(async () => {
   return NextResponse.json({ absences: rows });
 });
 
+const createAbsenceSchema = z.object({
+  startDate: zDate,
+  endDate: zDate,
+  type: z.enum(["sick", "unavailable", "vacation"]).optional().default("vacation"),
+  note: z.string().trim().max(1000).optional().default(""),
+});
+
 export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
-  const body = await request.json().catch(() => null);
-  if (!body?.startDate || !body?.endDate) return badRequest("Specify the requested period.");
+  const { data: body, error: validationError } = await parseBody(request, createAbsenceSchema);
+  if (validationError) return validationError;
 
   const id = newId("abs");
-  const type = body.type === "sick" ? "sick" : body.type === "unavailable" ? "unavailable" : "vacation";
+  const type = body.type;
   const status = user.role === "owner" ? "approved" : "pending";
   await db.insert(absenceRequests).values({
     id,
@@ -31,7 +40,7 @@ export const POST = withRoute(async (request: NextRequest) => {
     type,
     startDate: body.startDate,
     endDate: body.endDate,
-    note: body.note?.trim() || "",
+    note: body.note,
     status,
   });
 
@@ -40,7 +49,7 @@ export const POST = withRoute(async (request: NextRequest) => {
     orgId: user.orgId,
     type: "absence_requested",
     title: type === "sick" ? `${user.name} called in sick` : `${user.name} requested time off`,
-    body: `${body.startDate} → ${body.endDate}${body.note?.trim() ? ` — "${body.note.trim()}"` : ""}`,
+    body: `${body.startDate} → ${body.endDate}${body.note ? ` — "${body.note}"` : ""}`,
     entityId: id,
   });
 
