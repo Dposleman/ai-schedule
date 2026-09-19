@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { organizations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireRole, badRequest, notFound, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, badRequest, notFound, withRoute } from "@/lib/api";
 
 // Logos are stored as data: URIs directly on the row — small enough (capped
 // below) that this beats standing up object storage just for this, and
@@ -20,7 +20,7 @@ export const GET = withRoute(async () => {
 export const PATCH = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+  const permissionError = await requireCapability(user, "organization.manage");
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));

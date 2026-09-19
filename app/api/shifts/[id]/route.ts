@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { shifts } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
-import { requireUser, requireRole, notFound, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
 
 function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return aStart < bEnd && bStart < aEnd;
@@ -12,13 +12,23 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
-  if (permissionError) return permissionError;
 
   const [existing] = await db.select().from(shifts).where(and(eq(shifts.id, id), eq(shifts.orgId, user.orgId))).limit(1);
   if (!existing) return notFound("Shift not found.");
 
   const body = await request.json().catch(() => ({}));
+
+  // Once published, editing it is gated by the org's "Edit published
+  // schedules" toggle rather than the baseline schedule.edit a manager
+  // always has. Reassigning an AI-generated shift away from its pick is
+  // gated separately by "Override an AI assignment".
+  const permissionError = await requireCapability(user, existing.published === 1 ? "schedule.edit_published" : "schedule.edit");
+  if (permissionError) return permissionError;
+  if (existing.aiGenerated === 1 && body.userId !== undefined && body.userId !== existing.userId) {
+    const overrideError = await requireCapability(user, "schedule.override_ai");
+    if (overrideError) return overrideError;
+  }
+
   const patch: Partial<typeof shifts.$inferInsert> = {};
   if (body.userId !== undefined) {
     patch.userId = body.userId || null;
@@ -55,7 +65,11 @@ export const DELETE = withRoute(async (_request: NextRequest, { params }: { para
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+
+  const [existing] = await db.select().from(shifts).where(and(eq(shifts.id, id), eq(shifts.orgId, user.orgId))).limit(1);
+  if (!existing) return notFound("Shift not found.");
+
+  const permissionError = await requireCapability(user, existing.published === 1 ? "schedule.edit_published" : "schedule.edit");
   if (permissionError) return permissionError;
 
   await db.delete(shifts).where(and(eq(shifts.id, id), eq(shifts.orgId, user.orgId)));

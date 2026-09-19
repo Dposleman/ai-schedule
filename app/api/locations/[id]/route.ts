@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { locations, users, shifts, dailyTasks, transfers } from "@/db/schema";
 import { and, eq, or } from "drizzle-orm";
-import { requireUser, requireRole, notFound, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
 
 const MAX_LOGO_BYTES = 600_000;
 
@@ -10,7 +10,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+  const permissionError = await requireCapability(user, "locations.manage");
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));
@@ -42,7 +42,7 @@ export const DELETE = withRoute(async (_request: NextRequest, { params }: { para
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner"]);
+  const permissionError = await requireCapability(user, "locations.delete");
   if (permissionError) return permissionError;
 
   const [existing] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.orgId, user.orgId))).limit(1);

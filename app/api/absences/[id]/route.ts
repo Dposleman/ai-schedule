@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { absenceRequests, shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, requireRole, notFound, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
 import { openCoverageForShift } from "@/lib/coverage";
 import { notify } from "@/lib/notifications";
 
@@ -10,7 +10,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+  const permissionError = await requireCapability(user, "absences.approve");
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));

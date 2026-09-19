@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getOrgPermissions, hasCapability, type Capability } from "@/lib/permissions";
 
 export type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
 
@@ -16,6 +17,23 @@ export function requireRole(user: NonNullable<SessionUser>, roles: Array<"owner"
     return NextResponse.json({ error: "You don't have permission for this action" }, { status: 403 });
   }
   return null;
+}
+
+/**
+ * Capability-based counterpart to requireRole(): checks a concrete action
+ * (see lib/permissions.ts) rather than a hardcoded role list, so a manager's
+ * access to the handful of capabilities the org owner can toggle (approving
+ * leave, transferring employees, editing published schedules, overriding an
+ * AI assignment) actually reflects what the owner configured in
+ * Settings > Permissions instead of being fixed in code.
+ */
+export async function requireCapability(user: NonNullable<SessionUser>, capability: Capability) {
+  // Owners and employees never depend on the org's configurable toggles, so
+  // skip the extra query in the common case.
+  if (hasCapability(user, capability, null)) return null;
+  const orgPermissions = await getOrgPermissions(user.orgId);
+  if (hasCapability(user, capability, orgPermissions)) return null;
+  return NextResponse.json({ error: "You don't have permission for this action" }, { status: 403 });
 }
 
 export function badRequest(message: string) {

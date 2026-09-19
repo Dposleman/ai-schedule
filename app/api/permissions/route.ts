@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { permissions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireRole, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, withRoute } from "@/lib/api";
 
 export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
@@ -14,7 +14,7 @@ export const GET = withRoute(async () => {
 export const PATCH = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner"]);
+  const permissionError = await requireCapability(user, "permissions.manage");
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));

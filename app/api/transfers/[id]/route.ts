@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { transfers, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, notFound, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 
 export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+  const permissionError = await requireCapability(user, "employees.transfer");
   if (permissionError) return permissionError;
 
   const [existing] = await db.select().from(transfers).where(and(eq(transfers.id, id), eq(transfers.orgId, user.orgId))).limit(1);

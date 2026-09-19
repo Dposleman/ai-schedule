@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { requireUser, requireRole, badRequest, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, badRequest, withRoute } from "@/lib/api";
 
 export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+  const permissionError = await requireCapability(user, "schedule.publish");
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => ({}));

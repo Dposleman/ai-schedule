@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { transfers, users, locations } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, badRequest, notFound, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, badRequest, notFound, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 
 export const GET = withRoute(async () => {
@@ -15,7 +15,7 @@ export const GET = withRoute(async () => {
 export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+  const permissionError = await requireCapability(user, "employees.transfer");
   if (permissionError) return permissionError;
 
   const body = await request.json().catch(() => null);

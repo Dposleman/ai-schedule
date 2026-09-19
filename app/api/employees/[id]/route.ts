@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, requireRole, notFound, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 
 export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
@@ -14,7 +14,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
 
   const isSelf = target.id === user.id;
   if (!isSelf) {
-    const permissionError = requireRole(user, ["owner", "manager"]);
+    const permissionError = await requireCapability(user, "employees.manage");
     if (permissionError) return permissionError;
     if (target.role === "owner" && user.role !== "owner") {
       return NextResponse.json({ error: "A manager cannot modify an owner." }, { status: 403 });
@@ -40,7 +40,7 @@ export const DELETE = withRoute(async (_request: NextRequest, { params }: { para
   const { id } = await params;
   const { user, error } = await requireUser();
   if (error) return error;
-  const permissionError = requireRole(user, ["owner", "manager"]);
+  const permissionError = await requireCapability(user, "employees.delete");
   if (permissionError) return permissionError;
 
   const [target] = await db.select().from(users).where(and(eq(users.id, id), eq(users.orgId, user.orgId))).limit(1);
