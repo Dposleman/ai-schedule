@@ -49,3 +49,8 @@ export type NotificationT = { id: string; type: string; title: string; body: str
 // The one shape used only inside app-shell-views.tsx (TimeTrackingView's
 // open attendance record) — kept here too so it's typed instead of `any`.
 export type OpenAttendanceT = { id: string; checkInAt: string; checkOutAt: string | null };
+
+// GET /api/attendance/today — org-wide, for Overview's staffing/exceptions
+// panel. shiftId is null for a clock-in that wasn't tied to a scheduled
+// shift (see app/api/attendance/route.ts).
+export type TodayAttendanceT = { id: string; userId: string; shiftId: string | null; checkInAt: string | null; checkOutAt: string | null };

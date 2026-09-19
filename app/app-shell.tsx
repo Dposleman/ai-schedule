@@ -20,7 +20,7 @@ import {
 } from "@/app/app-shell-views";
 import type {
   CurrentUser, LocationT, OrgT, EmployeeT, ShiftT, AbsenceT, TransferT, TaskT,
-  CoverageRequestT, PermissionsT, NotificationT,
+  CoverageRequestT, PermissionsT, NotificationT, TodayAttendanceT,
 } from "@/lib/view-types";
 
 type NavKey =
@@ -102,6 +102,7 @@ export default function AppShell({
   const [tasks, setTasks] = useState<TaskT[]>([]);
   const [coverage, setCoverage] = useState<CoverageRequestT[]>([]);
   const [permissions, setPermissions] = useState<PermissionsT | null>(null);
+  const [attendanceToday, setAttendanceToday] = useState<TodayAttendanceT[]>([]);
 
   const [weekStart, setWeekStart] = useState(() => toISODate(startOfWeek()));
   const weekEnd = useMemo(() => toISODate(addDays(new Date(`${weekStart}T00:00:00`), 6)), [weekStart]);
@@ -125,7 +126,7 @@ export default function AppShell({
 
   const loadAll = useCallback(async () => {
     try {
-      const [org, loc, emp, shf, abs, unavail, trf, tsk, cov, perm] = await Promise.all([
+      const [org, loc, emp, shf, abs, unavail, trf, tsk, cov, perm, attToday] = await Promise.all([
         api<{ organization: OrgT }>("/api/organization"),
         api<{ locations: LocationT[] }>("/api/locations"),
         api<{ employees: EmployeeT[] }>("/api/employees"),
@@ -136,6 +137,7 @@ export default function AppShell({
         api<{ tasks: TaskT[] }>(`/api/tasks?date=${todayISO()}`),
         api<{ requests: CoverageRequestT[] }>("/api/coverage"),
         api<{ permissions: PermissionsT | null }>("/api/permissions"),
+        api<{ attendance: TodayAttendanceT[] }>("/api/attendance/today"),
       ]);
       setOrganization(org.organization);
       setLocations(loc.locations);
@@ -147,6 +149,7 @@ export default function AppShell({
       setTasks(tsk.tasks);
       setCoverage(cov.requests);
       setPermissions(perm.permissions);
+      setAttendanceToday(attToday.attendance);
     } catch (error) {
       fail(error);
     } finally {
@@ -347,7 +350,7 @@ export default function AppShell({
         <div className={`content ${currentUser.role === "employee" ? "density-airy" : "density-compact"}`}>
           {loading ? <div className="empty-state">{t("shell.loading")}</div> : (
             <>
-              {activeNav === "resumen" && <ResumenView employees={employees} shifts={shifts} weekStart={weekStart} weekEnd={weekEnd} location={location} locations={locations} absences={absences} coverage={coverage} onGoPlanner={() => setActiveNav("planner")} onGoAusencias={() => setActiveNav("absences")} onGoChat={() => setActiveNav("chat")} />}
+              {activeNav === "resumen" && <ResumenView employees={employees} shifts={shifts} weekStart={weekStart} weekEnd={weekEnd} location={location} locations={locations} absences={absences} coverage={coverage} attendanceToday={attendanceToday} onGoPlanner={() => setActiveNav("planner")} onGoAusencias={() => setActiveNav("absences")} onGoChat={() => setActiveNav("chat")} onGoTimeTracking={() => setActiveNav("timetracking")} onGoCosts={() => setActiveNav("costs")} />}
               {activeNav === "myshift" && <MyShiftView shift={currentUserToday} locations={locations} tasks={tasks} currentUser={currentUser} />}
               {activeNav === "planner" && (
                 <PlannerView

@@ -5,7 +5,7 @@ import { Geolocation } from "@capacitor/geolocation";
 import { apiFetch } from "@/lib/api-client";
 import { distanceInMeters } from "@/lib/geo";
 import {
-  AlertTriangle, ArrowLeftRight, ArrowUpRight, Bot, Building2, Crown, CalendarDays,
+  AlertTriangle, ArrowLeftRight, ArrowUpRight, Banknote, Bot, Building2, Crown, CalendarDays,
   CalendarX2, Check, CheckCircle2, ClipboardCheck, Clock3, FileCheck2, Fingerprint, LockKeyhole,
   Image as ImageIcon, Mail, MapPin, Phone, ReceiptText, Search, Send, ShieldCheck, Sparkles, Store,
   Trash2, Umbrella, UserPlus, UserCheck, UsersRound, WandSparkles, X,
@@ -15,7 +15,7 @@ import { useLanguage } from "@/app/language-context";
 import { LANGUAGES } from "@/lib/i18n";
 import type {
   CurrentUser, LocationT, OrgT, EmployeeT, ShiftT, AbsenceT, TransferT, TaskT,
-  CoverageRequestT, PermissionsT, OpenAttendanceT,
+  CoverageRequestT, PermissionsT, OpenAttendanceT, TodayAttendanceT,
 } from "@/lib/view-types";
 
 // Resizes/re-encodes an uploaded image client-side before it goes anywhere
@@ -71,12 +71,30 @@ export function MetricCard({ label, value, detail, tone, icon: Icon }: { label: 
   );
 }
 
-export function ResumenView({ employees, shifts, weekStart, weekEnd, location, locations, absences, coverage, onGoPlanner, onGoAusencias, onGoChat }: {
+// Attendance clock-in window slack — mirrors CLOCK_IN_WINDOW_MINUTES_BEFORE
+// in app/api/attendance/route.ts. Used only to decide when a shift with no
+// clock-in yet should be flagged as an exception rather than "upcoming".
+const LATE_AFTER_MINUTES = 15;
+
+type TodayStatus = "checked_in" | "checked_out" | "late" | "upcoming";
+
+function todayStaffingStatus(shift: ShiftT, attendanceToday: TodayAttendanceT[]): TodayStatus {
+  const att = attendanceToday.find((a) => a.shiftId === shift.id);
+  if (att && !att.checkOutAt) return "checked_in";
+  if (att && att.checkOutAt) return "checked_out";
+  const now = new Date();
+  const [sh, sm] = shift.startTime.split(":").map(Number);
+  const shiftStart = new Date(now);
+  shiftStart.setHours(sh, sm + LATE_AFTER_MINUTES, 0, 0);
+  return now > shiftStart ? "late" : "upcoming";
+}
+
+export function ResumenView({ employees, shifts, weekStart, weekEnd, location, locations, absences, coverage, attendanceToday, onGoPlanner, onGoAusencias, onGoChat, onGoTimeTracking, onGoCosts }: {
   employees: EmployeeT[]; shifts: ShiftT[]; weekStart: string; weekEnd: string; location: string;
-  locations: LocationT[]; absences: AbsenceT[]; coverage: CoverageRequestT[];
-  onGoPlanner: () => void; onGoAusencias: () => void; onGoChat: () => void;
+  locations: LocationT[]; absences: AbsenceT[]; coverage: CoverageRequestT[]; attendanceToday: TodayAttendanceT[];
+  onGoPlanner: () => void; onGoAusencias: () => void; onGoChat: () => void; onGoTimeTracking: () => void; onGoCosts: () => void;
 }) {
-  const { t, lang } = useLanguage();
+  const { t, lang, locale } = useLanguage();
   const weekShifts = shifts.filter((s) => location === "all" || s.locationId === location);
   const assignedHours = weekShifts.filter((s) => s.userId).reduce((sum, s) => sum + hoursBetween(s.startTime, s.endTime), 0);
   const totalShifts = weekShifts.length;
@@ -87,6 +105,31 @@ export function ResumenView({ employees, shifts, weekStart, weekEnd, location, l
   const openCoverage = coverage.filter((c) => c.status === "open");
   const days = weekDays(weekStart, lang);
   const locationName = location === "all" ? t("allLocations.lower") : locations.find((l) => l.id === location)?.name ?? "";
+
+  // Today's staffing + attendance exceptions (master prompt 11.4: Overview
+  // must show today staffing and attendance exceptions, not just the week
+  // grid). "Exception" here means a shift whose start time has passed by
+  // more than the clock-in slack with no clock-in recorded yet.
+  const today = todayISO();
+  const todayShifts = weekShifts.filter((s) => s.date === today && s.userId).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const todayRows = todayShifts.map((shift) => ({ shift, employee: employees.find((e) => e.id === shift.userId), status: todayStaffingStatus(shift, attendanceToday) }));
+  const exceptionCount = todayRows.filter((r) => r.status === "late").length;
+
+  // Labour/budget signal — reuses the same weekly cost-vs-budget semantics
+  // as CostsView (locations.budgetCents is treated as a weekly figure
+  // there), just narrowed to today's shifts and presented as an even daily
+  // share of that weekly budget so it's comparable. hourlyRateCents is
+  // already stripped server-side for non-management roles, and this whole
+  // view is management-only (not in the employee nav), so no separate
+  // compensation gate is needed here.
+  const scopedLocations = locations.filter((l) => location === "all" || l.id === location);
+  const weeklyBudgetCents = scopedLocations.reduce((sum, l) => sum + (l.budgetCents ?? 0), 0);
+  const dailyBudgetCents = Math.round(weeklyBudgetCents / 7);
+  const todayLabourCents = todayShifts.reduce((sum, s) => {
+    const emp = employees.find((e) => e.id === s.userId);
+    return sum + (emp ? (emp.hourlyRateCents ?? 0) * hoursBetween(s.startTime, s.endTime) : 0);
+  }, 0);
+  const labourPct = dailyBudgetCents > 0 ? Math.round((todayLabourCents / dailyBudgetCents) * 100) : 0;
 
   return (
     <>
@@ -155,6 +198,49 @@ export function ResumenView({ employees, shifts, weekStart, weekEnd, location, l
             ))}
             {pendingAbsences.length === 0 && openCoverage.length === 0 && <p className="empty-state">{t("resumen.nothingPending")}</p>}
           </div>
+        </aside>
+      </section>
+
+      <section className="dashboard-grid">
+        <article className="schedule-card">
+          <div className="section-heading">
+            <div><div className="section-title-line"><h3>{t("resumen.todayStaffing")}</h3>{exceptionCount > 0 && <span className="attention-count">{exceptionCount}</span>}</div><p>{t("resumen.todayStaffingSubtitle", { count: todayRows.length })}</p></div>
+            <button className="secondary-button" onClick={onGoTimeTracking}>{t("resumen.viewTimeTracking")} <ArrowUpRight size={14} /></button>
+          </div>
+          {todayRows.length === 0 ? (
+            <div className="empty-state">{t("resumen.noShiftsToday")}</div>
+          ) : (
+            <div>
+              {todayRows.map(({ shift, employee, status }) => (
+                <div className="permission-row" key={shift.id}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <div className={`avatar ${employee?.color ?? "blue"}`}>{employee ? initials(employee.name) : "?"}</div>
+                    <div><strong>{employee?.name ?? "—"}</strong><span>{shift.startTime}–{shift.endTime}</span></div>
+                  </div>
+                  <em className={`status-pill ${status === "checked_in" ? "available" : status === "checked_out" ? "transfer" : status === "late" ? "away" : ""}`}>
+                    {status === "checked_in" && t("resumen.attendance.checkedIn")}
+                    {status === "checked_out" && t("resumen.attendance.checkedOut")}
+                    {status === "late" && t("resumen.attendance.late")}
+                    {status === "upcoming" && t("resumen.attendance.upcoming")}
+                  </em>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+
+        <aside className="attention-card">
+          <div className="section-heading compact"><div><h3>{t("resumen.labourSignal")}</h3><p>{t("resumen.labourSignalSubtitle")}</p></div><Banknote size={20} /></div>
+          {weeklyBudgetCents === 0 ? (
+            <p className="empty-state">{t("resumen.labourNoBudget")}</p>
+          ) : (
+            <div className="budget-row">
+              <div><strong>{money(todayLabourCents, locale)}</strong><span>/ {money(dailyBudgetCents, locale)}</span></div>
+              <div className="budget-track"><i style={{ width: `${Math.min(labourPct, 100)}%` }} /></div>
+              <em className={`status-pill ${labourPct > 100 ? "away" : "available"}`}>{labourPct > 100 ? t("costs.overBudget") : t("costs.onTarget")}</em>
+            </div>
+          )}
+          <button className="text-button" onClick={onGoCosts}>{t("resumen.viewCosts")} <ArrowUpRight size={12} /></button>
         </aside>
       </section>
     </>
