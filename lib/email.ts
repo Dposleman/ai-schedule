@@ -16,8 +16,13 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
       },
       body: JSON.stringify({ from: fromAddress(), to: [to], subject, html }),
     });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      console.error(`[email] Resend rejected send to ${to}: ${response.status} ${body}`);
+    }
     return response.ok;
-  } catch {
+  } catch (err) {
+    console.error(`[email] Resend request failed for ${to}:`, err);
     return false;
   }
 }
