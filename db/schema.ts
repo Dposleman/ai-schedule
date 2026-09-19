@@ -167,6 +167,22 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
+// Server-side session records — what makes a session revocable. The cookie
+// only ever holds a high-entropy random token; only its hash is stored here
+// (same reasoning as passwordResetTokens above), and a session with no
+// matching non-revoked, non-expired row here is simply not logged in
+// anymore, even if the browser still has the cookie.
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  userAgent: text("user_agent").notNull().default(""),
+  ipAddress: text("ip_address").notNull().default(""),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { mode: "string" }).notNull(),
+  revokedAt: timestamp("revoked_at", { mode: "string" }),
+});
+
 export const permissions = pgTable("permissions", {
   orgId: text("org_id").primaryKey().references(() => organizations.id, { onDelete: "cascade" }),
   approveLeave: integer("approve_leave").notNull().default(1),
