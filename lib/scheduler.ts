@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { shifts, users, absenceRequests, unavailability } from "@/db/schema";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { newId } from "@/lib/auth";
 
 const SHIFT_BLOCKS = [
@@ -22,6 +22,19 @@ function hoursBetween(start: string, end: string) {
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
   return (eh * 60 + em - (sh * 60 + sm)) / 60;
+}
+
+function timeToMinutes(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// The fixed shift blocks (10:00-18:00 and 16:00-23:00) share a 16:00-18:00
+// window, so without this check the same person could greedily be chosen
+// for both blocks on the same day (lowest-hours-so-far) and end up with two
+// overlapping assignments.
+function blocksOverlap(a: { start: string; end: string }, b: { start: string; end: string }) {
+  return timeToMinutes(a.start) < timeToMinutes(b.end) && timeToMinutes(b.start) < timeToMinutes(a.end);
 }
 
 /**
@@ -53,7 +66,10 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
     return approvedLeave.some((leave) => leave.userId === userId && date >= leave.startDate && date <= leave.endDate);
   };
 
-  // Remove existing draft (unpublished) AI shifts for this week/location before regenerating.
+  // Remove existing draft (unpublished) AI shifts for this week/location
+  // before regenerating — scoped to locationIds too, not just the week,
+  // so regenerating one location's schedule never wipes another
+  // location's untouched drafts for the same week.
   await db
     .delete(shifts)
     .where(
@@ -61,11 +77,16 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
         eq(shifts.orgId, orgId),
         eq(shifts.published, 0),
         gte(shifts.date, weekStart),
-        lte(shifts.date, weekEnd)
+        lte(shifts.date, weekEnd),
+        inArray(shifts.locationId, locationIds)
       )
     );
 
   const hoursAssigned = new Map<string, number>(eligibleStaff.map((person) => [person.id, 0]));
+  // Tracks the time blocks already assigned to each person on each date
+  // (key: "personId|date") so a candidate whose new block would overlap an
+  // assignment they already have that day is excluded.
+  const assignedBlocksByPersonDate = new Map<string, { start: string; end: string }[]>();
   const created: (typeof shifts.$inferInsert)[] = [];
 
   for (const locationId of locationIds) {
@@ -78,6 +99,10 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
       for (const block of SHIFT_BLOCKS) {
         const candidates = locationStaff
           .filter((person) => !isBlocked(person.id, date))
+          .filter((person) => {
+            const existing = assignedBlocksByPersonDate.get(`${person.id}|${date}`) ?? [];
+            return !existing.some((assigned) => blocksOverlap(assigned, block));
+          })
           .filter((person) => {
             const target = person.weeklyHourTarget || 40;
             const already = hoursAssigned.get(person.id) ?? 0;
@@ -102,6 +127,10 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
         });
         if (chosen) {
           hoursAssigned.set(chosen.id, (hoursAssigned.get(chosen.id) ?? 0) + hoursBetween(block.start, block.end));
+          const key = `${chosen.id}|${date}`;
+          const existing = assignedBlocksByPersonDate.get(key) ?? [];
+          existing.push({ start: block.start, end: block.end });
+          assignedBlocksByPersonDate.set(key, existing);
         }
       }
     }

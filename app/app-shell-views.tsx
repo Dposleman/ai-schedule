@@ -436,8 +436,8 @@ export function CostsView({ locations, employees, shifts }: { locations: Locatio
         // Multiply in integer cents first, and only convert to decimal once
         // at the very end — avoids compounding floating-point rounding
         // error across the rate → cost conversion.
-        const costCents = Math.round(hours * emp.hourlyRateCents);
-        rows.push([loc.name, emp.name, s.date, s.startTime, s.endTime, hours.toFixed(2), (emp.hourlyRateCents / 100).toFixed(2), (costCents / 100).toFixed(2)]);
+        const costCents = Math.round(hours * (emp.hourlyRateCents ?? 0));
+        rows.push([loc.name, emp.name, s.date, s.startTime, s.endTime, hours.toFixed(2), ((emp.hourlyRateCents ?? 0) / 100).toFixed(2), (costCents / 100).toFixed(2)]);
       });
     });
     const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -461,14 +461,15 @@ export function CostsView({ locations, employees, shifts }: { locations: Locatio
           const locShifts = shifts.filter((s) => s.locationId === loc.id && s.userId);
           const actualCents = locShifts.reduce((sum, s) => {
             const emp = employees.find((e) => e.id === s.userId);
-            return sum + (emp ? emp.hourlyRateCents * hoursBetween(s.startTime, s.endTime) : 0);
+            return sum + (emp ? (emp.hourlyRateCents ?? 0) * hoursBetween(s.startTime, s.endTime) : 0);
           }, 0);
-          const percent = loc.budgetCents > 0 ? Math.round((actualCents / loc.budgetCents) * 100) : 0;
+          const budgetCents = loc.budgetCents ?? 0;
+          const percent = budgetCents > 0 ? Math.round((actualCents / budgetCents) * 100) : 0;
           return (
             <div className="budget-row" key={loc.id}>
-              <div><strong>{loc.name}</strong><span>{money(actualCents, locale)} {loc.budgetCents > 0 ? `/ ${money(loc.budgetCents, locale)}` : t("costs.noBudget")}</span></div>
+              <div><strong>{loc.name}</strong><span>{money(actualCents, locale)} {(loc.budgetCents ?? 0) > 0 ? `/ ${money(loc.budgetCents ?? 0, locale)}` : t("costs.noBudget")}</span></div>
               <div className="budget-track"><i style={{ width: `${Math.min(percent, 100)}%` }} /></div>
-              <em className={`status-pill ${percent > 100 ? "away" : "available"}`}>{loc.budgetCents === 0 ? t("costs.setBudget") : percent > 100 ? t("costs.overBudget") : t("costs.onTarget")}</em>
+              <em className={`status-pill ${percent > 100 ? "away" : "available"}`}>{(loc.budgetCents ?? 0) === 0 ? t("costs.setBudget") : percent > 100 ? t("costs.overBudget") : t("costs.onTarget")}</em>
             </div>
           );
         })}
@@ -496,7 +497,7 @@ export function TeamView({ employees, locations, onTransfer }: {
             <span className="person-summary"><span className={`avatar ${person.color}`}>{initials(person.name)}</span><span><strong>{person.name}</strong><small>{person.occupation}</small></span></span>
             <span><MapPin size={13} /> {locationName(person.homeLocationId)}</span>
             <span><Building2 size={13} /> {locationName(person.currentLocationId)}</span>
-            <span className="hours-cell"><strong>{money(person.hourlyRateCents, locale)}</strong></span>
+            <span className="hours-cell"><strong>{money(person.hourlyRateCents ?? 0, locale)}</strong></span>
             <span><em className={`status-pill ${person.homeLocationId === person.currentLocationId ? "available" : "transfer"}`}>{person.homeLocationId === person.currentLocationId ? t("team.atHome") : t("team.transferred")}</em></span>
             <span><button className="row-action" onClick={() => onTransfer(person)}>{t("team.transfer")} <ArrowLeftRight size={13} /></button></span>
           </div>

@@ -13,18 +13,24 @@ export type CurrentUser = {
   language: Lang;
 };
 
+// budgetCents is management-only: GET /api/locations omits it for
+// employee-role callers (see app/api/locations/route.ts).
 export type LocationT = {
   id: string; name: string; address: string; openHours: string;
-  latitude: number; longitude: number; radiusMeters: number; budgetCents: number;
+  latitude: number; longitude: number; radiusMeters: number; budgetCents?: number;
   logoUrl: string | null;
 };
 
 export type OrgT = { id: string; name: string; logoUrl: string | null };
 
+// hourlyRateCents/weeklyHourTarget are management-only data: GET
+// /api/employees now omits them entirely for employee-role callers (see
+// app/api/employees/route.ts), so they're optional here rather than
+// guaranteed present.
 export type EmployeeT = {
   id: string; name: string; email: string; role: Role; occupation: string; phone: string;
   color: string; homeLocationId: string | null; currentLocationId: string | null;
-  hourlyRateCents: number; weeklyHourTarget: number;
+  hourlyRateCents?: number; weeklyHourTarget?: number;
 };
 
 export type ShiftT = {

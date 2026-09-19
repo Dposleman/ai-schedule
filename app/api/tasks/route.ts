@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { dailyTasks } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { requireUser, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { parseBody, parseQuery, zDate, zId, zText, zTime } from "@/lib/validation";
 
@@ -33,6 +33,8 @@ const createTaskSchema = z.object({
 export const POST = withRoute(async (request: NextRequest) => {
   const { user, error } = await requireUser();
   if (error) return error;
+  const permissionError = await requireCapability(user, "tasks.manage");
+  if (permissionError) return permissionError;
   const { data, error: validationError } = await parseBody(request, createTaskSchema);
   if (validationError) return validationError;
 

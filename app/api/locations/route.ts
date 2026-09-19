@@ -24,7 +24,14 @@ export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const rows = await db.select().from(locations).where(eq(locations.orgId, user.orgId));
-  return NextResponse.json({ locations: rows });
+  // budgetCents is management-only (payroll/cost data). Coordinates and
+  // radius stay visible to employees too — the Time Tracking screen's
+  // in-range indicator is client-side UX only, the server always
+  // re-validates the real distance from the DB before accepting a check-in
+  // (see app/api/attendance/route.ts), so these aren't a security boundary.
+  const canSeeBudget = user.role === "owner" || user.role === "manager";
+  const safe = rows.map(({ budgetCents, ...rest }) => (canSeeBudget ? { ...rest, budgetCents } : rest));
+  return NextResponse.json({ locations: safe });
 });
 
 export const POST = withRoute(async (request: NextRequest) => {

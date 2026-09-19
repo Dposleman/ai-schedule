@@ -3,6 +3,7 @@ import { coverageRequests, coverageCandidates, shifts, users, unavailability, ab
 import { and, eq } from "drizzle-orm";
 import { newId } from "@/lib/auth";
 import { notify, notifyMany, managersOf } from "@/lib/notifications";
+import { rangesOverlap } from "@/lib/time";
 
 /**
  * Opens a shift back up and invites every compatible, available person at
@@ -19,6 +20,9 @@ export async function openCoverageForShift(orgId: string, shiftId: string, reaso
   const staff = await db.select().from(users).where(eq(users.orgId, orgId));
   const unavailableRows = await db.select().from(unavailability).where(eq(unavailability.date, shift.date));
   const approvedLeave = await db.select().from(absenceRequests).where(and(eq(absenceRequests.orgId, orgId), eq(absenceRequests.status, "approved")));
+  // Every other shift anyone in this org already has that same day, so we
+  // never invite someone who'd end up double-booked if they accepted.
+  const sameDayShifts = await db.select().from(shifts).where(and(eq(shifts.orgId, orgId), eq(shifts.date, shift.date)));
 
   const eligible = staff.filter((person) => {
     if (person.role === "owner") return false;
@@ -26,6 +30,7 @@ export async function openCoverageForShift(orgId: string, shiftId: string, reaso
     if ((person.currentLocationId ?? person.homeLocationId) !== shift.locationId) return false;
     if (unavailableRows.some((row) => row.userId === person.id)) return false;
     if (approvedLeave.some((leave) => leave.userId === person.id && shift.date >= leave.startDate && shift.date <= leave.endDate)) return false;
+    if (sameDayShifts.some((s) => s.userId === person.id && s.id !== shift.id && rangesOverlap(s.startTime, s.endTime, shift.startTime, shift.endTime))) return false;
     return true;
   });
 

@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { attendance, locations } from "@/db/schema";
+import { attendance, locations, shifts } from "@/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { requireUser, badRequest, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { distanceInMeters, GPS_ACCURACY_SLACK_METERS } from "@/lib/geo";
+import { timeToMinutes } from "@/lib/time";
 import { zId } from "@/lib/validation";
+
+// How early/late a clock-in is accepted relative to the shift's own
+// start/end. Wide enough for an early arrival or a shift running long,
+// narrow enough that it can't be used to clock into a shift on a
+// different day or shifted by hours.
+const CLOCK_IN_WINDOW_MINUTES_BEFORE = 30;
+const CLOCK_IN_WINDOW_MINUTES_AFTER_END = 60;
 
 const gpsCoord = z.coerce.number({ error: "Missing device location — enable GPS and try again." });
 
@@ -57,6 +65,30 @@ export const POST = withRoute(async (request: NextRequest) => {
       .where(and(eq(locations.id, locationId), eq(locations.orgId, user.orgId)))
       .limit(1);
     if (!site) return badRequest("Location not found.");
+
+    // If a shift is claimed, bind the check-in to it for real: it must
+    // belong to this user, in this org, at this location, and the current
+    // time must fall inside a reasonable window around the shift's own
+    // start/end — otherwise a shiftId is just an unvalidated free-text
+    // pointer and check-in isn't actually tied to the schedule at all.
+    if (body.shiftId) {
+      const [shift] = await db
+        .select()
+        .from(shifts)
+        .where(and(eq(shifts.id, body.shiftId), eq(shifts.orgId, user.orgId)))
+        .limit(1);
+      if (!shift) return badRequest("That shift no longer exists.");
+      if (shift.userId !== user.id) return badRequest("That shift isn't assigned to you.");
+      if (shift.locationId !== locationId) return badRequest("That shift is at a different location.");
+      const today = new Date().toISOString().slice(0, 10);
+      if (shift.date !== today) return badRequest("That shift isn't scheduled for today.");
+      const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+      const windowStart = timeToMinutes(shift.startTime) - CLOCK_IN_WINDOW_MINUTES_BEFORE;
+      const windowEnd = timeToMinutes(shift.endTime) + CLOCK_IN_WINDOW_MINUTES_AFTER_END;
+      if (nowMinutes < windowStart || nowMinutes > windowEnd) {
+        return badRequest(`Check-in for this shift is only allowed from ${shift.startTime} onward.`);
+      }
+    }
 
     // Guard against a double clock-in from a flaky connection / double tap:
     // one open (not-yet-checked-out) session per person, enforced here and

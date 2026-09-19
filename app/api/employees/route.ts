@@ -15,7 +15,14 @@ export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const rows = await db.select().from(users).where(eq(users.orgId, user.orgId));
-  const safe = rows.map(({ passwordHash: _passwordHash, ...rest }) => rest);
+  // Compensation (hourlyRateCents, weeklyHourTarget) is management-only data
+  // — an ordinary employee calling this endpoint (e.g. for the Team/Staff
+  // directory) must never see a colleague's, or even their own, pay rate
+  // through it. Owners and managers get the full row.
+  const canSeeCompensation = user.role === "owner" || user.role === "manager";
+  const safe = rows.map(({ passwordHash: _passwordHash, hourlyRateCents, weeklyHourTarget, ...rest }) =>
+    canSeeCompensation ? { ...rest, hourlyRateCents, weeklyHourTarget } : rest
+  );
   return NextResponse.json({ employees: safe });
 });
 
