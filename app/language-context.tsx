@@ -26,10 +26,16 @@ export function LanguageProvider({
 }) {
   const [lang, setLangState] = useState<Lang>(initialLang ?? DEFAULT_LANG);
 
+  // Reads localStorage, which doesn't exist during SSR, so the saved
+  // language can't be known until after mount — rendering the default (or
+  // account) language first on both server and client, then correcting it
+  // here, is what keeps the initial client render matching the server HTML
+  // instead of triggering a hydration mismatch.
   useEffect(() => {
     if (initialLang) return;
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as Lang | null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved === "en" || saved === "da") setLangState(saved);
     } catch {
       // ignore

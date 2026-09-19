@@ -8,52 +8,20 @@ import {
   LayoutDashboard, LoaderCircle, LogOut, MessageCircle,
   Moon, Settings2, ShieldCheck, Sparkles, Store, Sun, Umbrella,
   UserCheck, UsersRound, WandSparkles, X,
+  type LucideIcon,
 } from "lucide-react";
 import { formatWeekRange, startOfWeek, toISODate, addDays, todayISO } from "@/lib/dates";
 import { useLanguage } from "@/app/language-context";
 import { LanguageSwitcher } from "@/app/language-switcher";
-import type { Lang } from "@/lib/i18n";
 import {
   ResumenView, MyShiftView, PlannerView, TimeTrackingView, DailyOperationsView, CostsView,
   TeamView, TransfersView, MyAbsencesView, AbsencesView, ChatView, StaffDirectoryView,
   LocationsView, AccountsView, SettingsView, TransferModal,
 } from "@/app/app-shell-views";
-
-type Role = "owner" | "manager" | "employee";
-
-type CurrentUser = {
-  id: string; orgId: string; name: string; email: string; role: Role;
-  occupation: string; phone: string; color: string;
-  homeLocationId: string | null; currentLocationId: string | null;
-  language: Lang;
-};
-
-type LocationT = {
-  id: string; name: string; address: string; openHours: string;
-  latitude: number; longitude: number; radiusMeters: number; budgetCents: number;
-  logoUrl: string | null;
-};
-
-type OrgT = { id: string; name: string; logoUrl: string | null };
-
-type EmployeeT = {
-  id: string; name: string; email: string; role: Role; occupation: string; phone: string;
-  color: string; homeLocationId: string | null; currentLocationId: string | null;
-  hourlyRateCents: number; weeklyHourTarget: number;
-};
-
-type ShiftT = {
-  id: string; locationId: string; userId: string | null; date: string;
-  startTime: string; endTime: string; role: string; status: string; published: number; aiGenerated: number;
-};
-
-type AbsenceT = { id: string; userId: string; type: string; startDate: string; endDate: string; status: string; note: string };
-type TransferT = { id: string; userId: string; fromLocationId: string; toLocationId: string; type: string; startDate: string; endDate: string | null; status: string };
-type TaskT = { id: string; locationId: string; name: string; ownerUserId: string | null; dueTime: string; date: string; automatic: number; completed: number };
-type CoverageCandidateT = { id: string; requestId: string; userId: string; matchScore: number; status: string };
-type CoverageRequestT = { id: string; shiftId: string; reason: string; status: string; acceptedByUserId: string | null; shift: ShiftT | null; candidates: CoverageCandidateT[] };
-type PermissionsT = { approveLeave: number; moveEmployees: number; editPublished: number; overrideAI: number };
-type NotificationT = { id: string; type: string; title: string; body: string; entityId: string | null; readAt: string | null; createdAt: string };
+import type {
+  CurrentUser, LocationT, OrgT, EmployeeT, ShiftT, AbsenceT, TransferT, TaskT,
+  CoverageRequestT, PermissionsT, NotificationT,
+} from "@/lib/view-types";
 
 type NavKey =
   | "resumen" | "myshift" | "planner" | "timetracking" | "dailyops" | "costs" | "team"
@@ -61,7 +29,7 @@ type NavKey =
 
 const AVATAR_COLORS = ["blue", "green", "orange", "pink", "lilac"];
 
-const managementNavItems: { key: NavKey; labelKey: string; icon: any }[] = [
+const managementNavItems: { key: NavKey; labelKey: string; icon: LucideIcon }[] = [
   { key: "resumen", labelKey: "nav.resumen", icon: LayoutDashboard },
   { key: "planner", labelKey: "nav.planner", icon: CalendarDays },
   { key: "timetracking", labelKey: "nav.timetracking", icon: Fingerprint },
@@ -76,7 +44,7 @@ const managementNavItems: { key: NavKey; labelKey: string; icon: any }[] = [
   { key: "accounts", labelKey: "nav.accounts", icon: ShieldCheck },
 ];
 
-const employeeNavItems: { key: NavKey; labelKey: string; icon: any }[] = [
+const employeeNavItems: { key: NavKey; labelKey: string; icon: LucideIcon }[] = [
   { key: "myshift", labelKey: "nav.myshift", icon: CalendarDays },
   { key: "timetracking", labelKey: "nav.timetracking", icon: Fingerprint },
   { key: "staff", labelKey: "nav.staff", icon: UserCheck },
@@ -186,6 +154,10 @@ export default function AppShell({
     }
   }, [weekStart, weekEnd]);
 
+  // Data fetch on mount/dependency change, not derived-state-from-props —
+  // the setState calls happen inside loadAll() after an await, in response
+  // to the API result, which is exactly what effects are for.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const loadNotifications = useCallback(async () => {
@@ -198,7 +170,11 @@ export default function AppShell({
     }
   }, []);
 
+  // Same as loadAll() above: this polls the notifications endpoint, and the
+  // setState calls happen inside the async loadNotifications() body — a
+  // subscribe-to-an-external-system effect, not synchronous derived state.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadNotifications();
     const interval = setInterval(loadNotifications, 30000);
     return () => clearInterval(interval);
@@ -218,8 +194,14 @@ export default function AppShell({
     }
   };
 
+  // Reads localStorage/matchMedia, which don't exist during SSR, so the
+  // theme can't be known until after mount — rendering "light" first on
+  // both server and client, then correcting it here, is what keeps the
+  // initial client render matching the server HTML instead of triggering a
+  // hydration mismatch.
   useEffect(() => {
     const savedTheme = (localStorage.getItem("ai-schedule-theme") as "light" | "dark" | null) ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(savedTheme);
     document.documentElement.dataset.theme = savedTheme;
   }, []);

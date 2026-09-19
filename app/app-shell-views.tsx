@@ -13,6 +13,10 @@ import {
 import { weekDays, formatWeekRange, todayISO } from "@/lib/dates";
 import { useLanguage } from "@/app/language-context";
 import { LANGUAGES } from "@/lib/i18n";
+import type {
+  CurrentUser, LocationT, OrgT, EmployeeT, ShiftT, AbsenceT, TransferT, TaskT,
+  CoverageRequestT, PermissionsT, OpenAttendanceT,
+} from "@/lib/view-types";
 
 // Resizes/re-encodes an uploaded image client-side before it goes anywhere
 // near the network — logos only need to render small, so there's no reason
@@ -67,18 +71,22 @@ export function MetricCard({ label, value, detail, tone, icon: Icon }: { label: 
   );
 }
 
-export function ResumenView({ employees, shifts, weekStart, weekEnd, location, locations, absences, coverage, onGoPlanner, onGoAusencias, onGoChat }: any) {
+export function ResumenView({ employees, shifts, weekStart, weekEnd, location, locations, absences, coverage, onGoPlanner, onGoAusencias, onGoChat }: {
+  employees: EmployeeT[]; shifts: ShiftT[]; weekStart: string; weekEnd: string; location: string;
+  locations: LocationT[]; absences: AbsenceT[]; coverage: CoverageRequestT[];
+  onGoPlanner: () => void; onGoAusencias: () => void; onGoChat: () => void;
+}) {
   const { t, lang } = useLanguage();
-  const weekShifts = shifts.filter((s: any) => location === "all" || s.locationId === location);
-  const assignedHours = weekShifts.filter((s: any) => s.userId).reduce((sum: number, s: any) => sum + hoursBetween(s.startTime, s.endTime), 0);
+  const weekShifts = shifts.filter((s) => location === "all" || s.locationId === location);
+  const assignedHours = weekShifts.filter((s) => s.userId).reduce((sum, s) => sum + hoursBetween(s.startTime, s.endTime), 0);
   const totalShifts = weekShifts.length;
-  const coveredShifts = weekShifts.filter((s: any) => s.userId).length;
+  const coveredShifts = weekShifts.filter((s) => s.userId).length;
   const coveragePct = totalShifts === 0 ? 0 : Math.round((coveredShifts / totalShifts) * 100);
-  const scopedEmployees = employees.filter((e: any) => location === "all" || (e.currentLocationId ?? e.homeLocationId) === location);
-  const pendingAbsences = absences.filter((a: any) => a.status === "pending");
-  const openCoverage = coverage.filter((c: any) => c.status === "open");
+  const scopedEmployees = employees.filter((e) => location === "all" || (e.currentLocationId ?? e.homeLocationId) === location);
+  const pendingAbsences = absences.filter((a) => a.status === "pending");
+  const openCoverage = coverage.filter((c) => c.status === "open");
   const days = weekDays(weekStart, lang);
-  const locationName = location === "all" ? t("allLocations.lower") : locations.find((l: any) => l.id === location)?.name ?? "";
+  const locationName = location === "all" ? t("allLocations.lower") : locations.find((l) => l.id === location)?.name ?? "";
 
   return (
     <>
@@ -104,7 +112,7 @@ export function ResumenView({ employees, shifts, weekStart, weekEnd, location, l
       <section className="dashboard-grid">
         <article className="schedule-card">
           <div className="section-heading">
-            <div><div className="section-title-line"><h3>{t("resumen.weekPlan")}</h3>{weekShifts.some((s: any) => s.aiGenerated && !s.published) && <span className="draft-pill">{t("resumen.draft")}</span>}</div><p>{formatWeekRange(weekStart, lang)} · {locationName}</p></div>
+            <div><div className="section-title-line"><h3>{t("resumen.weekPlan")}</h3>{weekShifts.some((s) => s.aiGenerated && !s.published) && <span className="draft-pill">{t("resumen.draft")}</span>}</div><p>{formatWeekRange(weekStart, lang)} · {locationName}</p></div>
             <button className="secondary-button" onClick={onGoPlanner}>{t("resumen.openPlanner")} <ArrowUpRight size={14} /></button>
           </div>
           {weekShifts.length === 0 ? (
@@ -114,11 +122,11 @@ export function ResumenView({ employees, shifts, weekStart, weekEnd, location, l
               <div className="schedule-table">
                 <div className="schedule-head employee-head">{t("team.colEmployee")}</div>
                 {days.map((d) => <div className="schedule-head day-head" key={d.date}><span>{d.label}</span><strong>{d.dayNumber}</strong></div>)}
-                {scopedEmployees.slice(0, 8).map((employee: any) => (
+                {scopedEmployees.slice(0, 8).map((employee) => (
                   <div className="schedule-row" key={employee.id}>
                     <div className="employee-cell"><div className={`avatar ${employee.color}`}>{initials(employee.name)}</div><div><strong>{employee.name}</strong><span>{employee.occupation}</span></div></div>
                     {days.map((d) => {
-                      const shift = weekShifts.find((s: any) => s.userId === employee.id && s.date === d.date);
+                      const shift = weekShifts.find((s) => s.userId === employee.id && s.date === d.date);
                       return <div className="shift-cell" key={d.date}><div className={`shift-block ${shift ? "work" : "empty"}`}>{shift ? <><i /><span>{shift.startTime}–{shift.endTime}</span></> : <span>—</span>}</div></div>;
                     })}
                   </div>
@@ -131,14 +139,14 @@ export function ResumenView({ employees, shifts, weekStart, weekEnd, location, l
         <aside className="attention-card">
           <div className="section-heading compact"><div><h3>{t("resumen.needsAttention")}</h3><p>{t("resumen.live")}</p></div><span className="attention-count">{pendingAbsences.length + openCoverage.length}</span></div>
           <div className="attention-list">
-            {openCoverage.map((c: any) => (
+            {openCoverage.map((c) => (
               <button className="attention-item urgent" key={c.id} onClick={onGoChat}>
                 <span className="attention-icon"><AlertTriangle size={17} /></span>
                 <span className="attention-copy"><em>{t("resumen.urgentCoverage")}</em><strong>{c.shift ? `${c.shift.date} · ${c.shift.startTime}–${c.shift.endTime}` : t("resumen.unassignedShift")}</strong><small>{c.reason}</small></span>
                 <span className="attention-arrow">›</span>
               </button>
             ))}
-            {pendingAbsences.map((a: any) => (
+            {pendingAbsences.map((a) => (
               <button className="attention-item" key={a.id} onClick={onGoAusencias}>
                 <span className="attention-icon leave"><Umbrella size={17} /></span>
                 <span className="attention-copy"><em>{t("resumen.request")}</em><strong>{absenceLabel(t, a.type)}</strong><small>{a.startDate} – {a.endDate}</small></span>
@@ -154,9 +162,11 @@ export function ResumenView({ employees, shifts, weekStart, weekEnd, location, l
 }
 
 /* ---------------- My Shift (employee) ---------------- */
-export function MyShiftView({ shift, locations, tasks, currentUser }: any) {
+export function MyShiftView({ shift, locations, tasks, currentUser }: {
+  shift: ShiftT | undefined; locations: LocationT[]; tasks: TaskT[]; currentUser: CurrentUser;
+}) {
   const { t } = useLanguage();
-  const location = locations.find((l: any) => l.id === shift?.locationId);
+  const location = locations.find((l) => l.id === shift?.locationId);
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("myshift.kicker")}</span><h2>{shift ? t("myshift.todayAt", { location: location?.name ?? t("myshift.today") }) : t("myshift.noShiftToday")}</h2><p>{t("myshift.onlyYours")}</p></div>
@@ -165,7 +175,7 @@ export function MyShiftView({ shift, locations, tasks, currentUser }: any) {
       {shift ? (
         <section className="my-shift-grid">
           <article className="my-shift-main"><small>{t("myshift.today")} · {shift.role || currentUser.occupation}</small><strong>{shift.startTime}–{shift.endTime}</strong><span><MapPin size={14} /> {location?.name}</span></article>
-          <article><ClipboardCheck size={21} /><strong>{t("myshift.tasksDone", { done: tasks.filter((t: any) => t.completed).length, total: tasks.length })}</strong><span>{t("myshift.atYourLocation")}</span></article>
+          <article><ClipboardCheck size={21} /><strong>{t("myshift.tasksDone", { done: tasks.filter((task) => task.completed).length, total: tasks.length })}</strong><span>{t("myshift.atYourLocation")}</span></article>
         </section>
       ) : (
         <div className="empty-state">{t("myshift.noneToday")}</div>
@@ -175,12 +185,17 @@ export function MyShiftView({ shift, locations, tasks, currentUser }: any) {
 }
 
 /* ---------------- Planner ---------------- */
-export function PlannerView({ employees, shifts, locations, location, weekStart, weekEnd, onPrevWeek, onNextWeek, onToday, onGenerate, onPublish, onAssign, onRequestCoverage }: any) {
+export function PlannerView({ employees, shifts, locations, location, weekStart, weekEnd, onPrevWeek, onNextWeek, onToday, onGenerate, onPublish, onAssign, onRequestCoverage }: {
+  employees: EmployeeT[]; shifts: ShiftT[]; locations: LocationT[]; location: string;
+  weekStart: string; weekEnd: string;
+  onPrevWeek: () => void; onNextWeek: () => void; onToday: () => void; onGenerate: () => void; onPublish: () => void;
+  onAssign: (shiftId: string, userId: string | null) => void; onRequestCoverage: (shiftId: string) => void;
+}) {
   const { t, lang } = useLanguage();
   const days = weekDays(weekStart, lang);
-  const scoped = shifts.filter((s: any) => location === "all" || s.locationId === location);
-  const hasDraft = scoped.some((s: any) => s.aiGenerated === 1 && s.published === 0);
-  const [editing, setEditing] = useState<any | null>(null);
+  const scoped = shifts.filter((s) => location === "all" || s.locationId === location);
+  const hasDraft = scoped.some((s) => s.aiGenerated === 1 && s.published === 0);
+  const [editing, setEditing] = useState<ShiftT | null>(null);
 
   const exportScheduleCsv = () => {
     const rows = [[
@@ -191,9 +206,9 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
       t("planner.csv.end"),
       t("planner.csv.status"),
     ]];
-    scoped.forEach((s: any) => {
-      const emp = employees.find((e: any) => e.id === s.userId);
-      const loc = locations.find((l: any) => l.id === s.locationId);
+    scoped.forEach((s) => {
+      const emp = employees.find((e) => e.id === s.userId);
+      const loc = locations.find((l) => l.id === s.locationId);
       rows.push([emp?.name ?? t("planner.csv.unassigned"), loc?.name ?? "", s.date, s.startTime, s.endTime, s.status]);
     });
     const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -221,7 +236,7 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
       <div className="planner-layout">
         <article className="schedule-card full-schedule">
           <div className="section-heading">
-            <div><div className="section-title-line"><h3>{location === "all" ? t("shell.allLocations") : locations.find((l: any) => l.id === location)?.name}</h3>{hasDraft && <span className="draft-pill">{t("resumen.draft")}</span>}</div><p>{t("planner.employeesCount", { count: employees.length })} · {t("planner.shiftsCount", { count: scoped.length })}</p></div>
+            <div><div className="section-title-line"><h3>{location === "all" ? t("shell.allLocations") : locations.find((l) => l.id === location)?.name}</h3>{hasDraft && <span className="draft-pill">{t("resumen.draft")}</span>}</div><p>{t("planner.employeesCount", { count: employees.length })} · {t("planner.shiftsCount", { count: scoped.length })}</p></div>
             <div className="section-actions"><button className="secondary-button" onClick={onToday}>{t("planner.today")}</button><button className="circle-button" onClick={onPrevWeek} aria-label={t("planner.prevWeek")}>‹</button><button className="circle-button" onClick={onNextWeek} aria-label={t("planner.nextWeek")}>›</button></div>
           </div>
           {employees.length === 0 ? <div className="empty-state">{t("planner.addEmployeesFirst")}</div> : (
@@ -229,11 +244,11 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
               <div className="schedule-table planner-table">
                 <div className="schedule-head employee-head">{t("team.colEmployee")}</div>
                 {days.map((d) => <div className="schedule-head day-head" key={d.date}><span>{d.label}</span><strong>{d.dayNumber}</strong></div>)}
-                {employees.map((employee: any) => (
+                {employees.map((employee) => (
                   <div className="schedule-row" key={employee.id}>
                     <div className="employee-cell"><div className={`avatar ${employee.color}`}>{initials(employee.name)}</div><div><strong>{employee.name}</strong><span>{employee.occupation}</span></div></div>
                     {days.map((d) => {
-                      const shift = scoped.find((s: any) => s.userId === employee.id && s.date === d.date);
+                      const shift = scoped.find((s) => s.userId === employee.id && s.date === d.date);
                       return (
                         <div className="shift-cell" key={d.date}>
                           <button type="button" className={`shift-block ${shift ? "work" : "empty"}`} onClick={() => shift && setEditing(shift)} style={{ border: 0, cursor: shift ? "pointer" : "default", width: "100%" }}>
@@ -244,11 +259,11 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
                     })}
                   </div>
                 ))}
-                {scoped.filter((s: any) => s.status === "open").length > 0 && (
+                {scoped.filter((s) => s.status === "open").length > 0 && (
                   <div className="schedule-row">
                     <div className="employee-cell"><div className="avatar orange">?</div><div><strong>{t("planner.uncovered")}</strong><span>{t("planner.openShifts")}</span></div></div>
                     {days.map((d) => {
-                      const open = scoped.find((s: any) => s.status === "open" && s.date === d.date);
+                      const open = scoped.find((s) => s.status === "open" && s.date === d.date);
                       return <div className="shift-cell" key={d.date}>{open ? <button className="shift-block blocked" onClick={() => onRequestCoverage(open.id)} style={{ border: 0, width: "100%", cursor: "pointer" }}><span>{open.startTime}–{open.endTime}</span></button> : <div className="shift-block empty"><span>—</span></div>}</div>;
                     })}
                   </div>
@@ -287,14 +302,16 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
 }
 
 /* ---------------- Time tracking ---------------- */
-export function TimeTrackingView({ location, currentUser, shift, onError }: any) {
+export function TimeTrackingView({ location, currentUser, shift, onError }: {
+  location: LocationT | null; currentUser: CurrentUser; shift: ShiftT | undefined; onError: (error: unknown) => void;
+}) {
   const { t } = useLanguage();
   const [distance, setDistance] = useState<number | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<any | null>(null);
+  const [open, setOpen] = useState<OpenAttendanceT | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -320,6 +337,7 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: any)
   };
 
   const checkIn = async () => {
+    if (!location) return;
     try {
       const response = await apiFetch("/api/attendance", {
         method: "POST",
@@ -368,7 +386,9 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: any)
 }
 
 /* ---------------- Daily operations ---------------- */
-export function DailyOperationsView({ tasks, locationId, onCreate, onToggle }: any) {
+export function DailyOperationsView({ tasks, locationId, onCreate, onToggle }: {
+  tasks: TaskT[]; locationId: string | undefined; onCreate: (name: string) => void; onToggle: (id: string, completed: boolean) => void;
+}) {
   const { t } = useLanguage();
   const [name, setName] = useState("");
   return (
@@ -380,7 +400,7 @@ export function DailyOperationsView({ tasks, locationId, onCreate, onToggle }: a
       </div>
       {tasks.length === 0 ? <div className="empty-state">{t("ops.noTasks")}</div> : (
         <section className="task-board">
-          {tasks.map((task: any, index: number) => (
+          {tasks.map((task, index) => (
             <article className={task.completed ? "task-item complete" : "task-item"} key={task.id}>
               <span className="task-check">{task.completed ? <Check size={18} /> : index + 1}</span>
               <div><small>{task.dueTime}</small><h3>{task.name}</h3><p>{task.completed ? t("ops.complete") : t("ops.pending")}</p></div>
@@ -394,7 +414,7 @@ export function DailyOperationsView({ tasks, locationId, onCreate, onToggle }: a
 }
 
 /* ---------------- Costs & payroll ---------------- */
-export function CostsView({ locations, employees, shifts }: any) {
+export function CostsView({ locations, employees, shifts }: { locations: LocationT[]; employees: EmployeeT[]; shifts: ShiftT[] }) {
   const { t, locale, lang } = useLanguage();
 
   const exportCsv = () => {
@@ -408,9 +428,9 @@ export function CostsView({ locations, employees, shifts }: any) {
       t("costs.csv.rate"),
       t("costs.csv.cost"),
     ]];
-    locations.forEach((loc: any) => {
-      shifts.filter((s: any) => s.locationId === loc.id && s.userId).forEach((s: any) => {
-        const emp = employees.find((e: any) => e.id === s.userId);
+    locations.forEach((loc) => {
+      shifts.filter((s) => s.locationId === loc.id && s.userId).forEach((s) => {
+        const emp = employees.find((e) => e.id === s.userId);
         if (!emp) return;
         const hours = hoursBetween(s.startTime, s.endTime);
         // Multiply in integer cents first, and only convert to decimal once
@@ -437,10 +457,10 @@ export function CostsView({ locations, employees, shifts }: any) {
       <div className="view-heading"><div><span className="view-kicker">{t("costs.kicker")}</span><h2>{t("costs.title")}</h2><p>{t("costs.subtitle")}</p></div><button className="primary-button" onClick={exportCsv}><ReceiptText size={16} /> {t("costs.exportCsv")}</button></div>
       <article className="data-card budget-card">
         <div className="card-heading"><div><h3>{t("costs.budgetByLocation")}</h3><p>{t("costs.budgetSubtitle")}</p></div><Bot size={20} /></div>
-        {locations.map((loc: any) => {
-          const locShifts = shifts.filter((s: any) => s.locationId === loc.id && s.userId);
-          const actualCents = locShifts.reduce((sum: number, s: any) => {
-            const emp = employees.find((e: any) => e.id === s.userId);
+        {locations.map((loc) => {
+          const locShifts = shifts.filter((s) => s.locationId === loc.id && s.userId);
+          const actualCents = locShifts.reduce((sum, s) => {
+            const emp = employees.find((e) => e.id === s.userId);
             return sum + (emp ? emp.hourlyRateCents * hoursBetween(s.startTime, s.endTime) : 0);
           }, 0);
           const percent = loc.budgetCents > 0 ? Math.round((actualCents / loc.budgetCents) * 100) : 0;
@@ -459,17 +479,19 @@ export function CostsView({ locations, employees, shifts }: any) {
 }
 
 /* ---------------- Team ---------------- */
-export function TeamView({ employees, locations, onTransfer }: any) {
+export function TeamView({ employees, locations, onTransfer }: {
+  employees: EmployeeT[]; locations: LocationT[]; onTransfer: (employee: EmployeeT) => void;
+}) {
   const { t, locale } = useLanguage();
   const [query, setQuery] = useState("");
-  const filtered = employees.filter((e: any) => `${e.name} ${e.occupation}`.toLowerCase().includes(query.toLowerCase()));
-  const locationName = (id: string | null) => locations.find((l: any) => l.id === id)?.name ?? t("team.unassigned");
+  const filtered = employees.filter((e) => `${e.name} ${e.occupation}`.toLowerCase().includes(query.toLowerCase()));
+  const locationName = (id: string | null) => locations.find((l) => l.id === id)?.name ?? t("team.unassigned");
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("team.kicker")}</span><h2>{t("team.peopleCount", { count: employees.length })}</h2><p>{t("team.subtitle")}</p></div><label className="directory-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("team.search")} /></label></div>
       <article className="data-card">
         <div className="team-table table-head"><span>{t("team.colEmployee")}</span><span>{t("team.colHome")}</span><span>{t("team.colCurrent")}</span><span>{t("team.colRate")}</span><span>{t("team.colStatus")}</span><span /></div>
-        {filtered.map((person: any) => (
+        {filtered.map((person) => (
           <div className="team-table table-row" key={person.id}>
             <span className="person-summary"><span className={`avatar ${person.color}`}>{initials(person.name)}</span><span><strong>{person.name}</strong><small>{person.occupation}</small></span></span>
             <span><MapPin size={13} /> {locationName(person.homeLocationId)}</span>
@@ -486,12 +508,14 @@ export function TeamView({ employees, locations, onTransfer }: any) {
 }
 
 /* ---------------- Transfers ---------------- */
-export function TransfersView({ employees, locations, transfers, onNew, onComplete }: any) {
+export function TransfersView({ employees, locations, transfers, onNew, onComplete }: {
+  employees: EmployeeT[]; locations: LocationT[]; transfers: TransferT[]; onNew: () => void; onComplete: (id: string) => void;
+}) {
   const { t } = useLanguage();
-  const locationName = (id: string) => locations.find((l: any) => l.id === id)?.name ?? "—";
-  const employeeName = (id: string) => employees.find((e: any) => e.id === id)?.name ?? "—";
-  const active = transfers.filter((t: any) => t.status === "active");
-  const completed = transfers.filter((t: any) => t.status === "completed");
+  const locationName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
+  const employeeName = (id: string) => employees.find((e) => e.id === id)?.name ?? "—";
+  const active = transfers.filter((tr) => tr.status === "active");
+  const completed = transfers.filter((tr) => tr.status === "completed");
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("transfers.kicker")}</span><h2>{t("transfers.title")}</h2><p>{t("transfers.subtitle")}</p></div><button className="primary-button" onClick={onNew} disabled={employees.length === 0}><ArrowLeftRight size={16} /> {t("transfers.new")}</button></div>
@@ -501,7 +525,7 @@ export function TransfersView({ employees, locations, transfers, onNew, onComple
       </section>
       <article className="data-card transfer-list-card">
         <div className="card-heading"><div><h3>{t("transfers.activeList")}</h3></div><span>{active.length}</span></div>
-        {active.map((tr: any) => (
+        {active.map((tr) => (
           <div className="transfer-route-row" key={tr.id}>
             <div className="person-summary"><span className="avatar green">{initials(employeeName(tr.userId))}</span><span><strong>{employeeName(tr.userId)}</strong></span></div>
             <div className="route-visual"><span><small>{t("transfers.origin")}</small><strong>{locationName(tr.fromLocationId)}</strong></span><i><ArrowUpRight size={15} /></i><span><small>{t("transfers.destination")}</small><strong>{locationName(tr.toLocationId)}</strong></span></div>
@@ -516,18 +540,20 @@ export function TransfersView({ employees, locations, transfers, onNew, onComple
 }
 
 /* ---------------- Absences (manager) ---------------- */
-export function AbsencesView({ absences, employees, onDecide }: any) {
+export function AbsencesView({ absences, employees, onDecide }: {
+  absences: AbsenceT[]; employees: EmployeeT[]; onDecide: (id: string, status: string) => void;
+}) {
   const { t } = useLanguage();
-  const employeeName = (id: string) => employees.find((e: any) => e.id === id)?.name ?? "—";
-  const pending = absences.filter((a: any) => a.status === "pending");
-  const decided = absences.filter((a: any) => a.status !== "pending").slice(0, 6);
+  const employeeName = (id: string) => employees.find((e) => e.id === id)?.name ?? "—";
+  const pending = absences.filter((a) => a.status === "pending");
+  const decided = absences.filter((a) => a.status !== "pending").slice(0, 6);
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("absences.kicker")}</span><h2>{t("absences.title")}</h2><p>{t("absences.subtitle")}</p></div></div>
       <section className="absence-layout">
         <section className="requests-column">
           <div className="card-heading no-border"><div><h3>{t("absences.pending")}</h3></div><span>{pending.length}</span></div>
-          {pending.map((request: any) => (
+          {pending.map((request) => (
             <article className="request-card featured-request" key={request.id}>
               <div className="request-person"><span className="avatar pink">{initials(employeeName(request.userId))}</span><div><strong>{employeeName(request.userId)}</strong></div><em>{absenceLabel(t, request.type).toUpperCase()}</em></div>
               <div className="request-period"><CalendarDays size={17} /><span><small>{t("absences.requestedPeriod")}</small><strong>{request.startDate} – {request.endDate}</strong></span></div>
@@ -539,7 +565,7 @@ export function AbsencesView({ absences, employees, onDecide }: any) {
         </section>
         <aside className="employee-preview-card">
           <div className="phone-label"><span><strong>{t("absences.recentDecisions")}</strong></span></div>
-          {decided.map((r: any) => (
+          {decided.map((r) => (
             <div key={r.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--line)", fontSize: 12 }}>
               <span>{employeeName(r.userId)} · {r.startDate}</span><em className={`status-pill ${r.status === "approved" ? "available" : "away"}`}>{r.status === "approved" ? t("absences.approved") : t("absences.rejected")}</em>
             </div>
@@ -552,7 +578,11 @@ export function AbsencesView({ absences, employees, onDecide }: any) {
 }
 
 /* ---------------- My absences (employee) ---------------- */
-export function MyAbsencesView({ unavailableDays, absences, onToggleDay, onRequest }: any) {
+export function MyAbsencesView({ unavailableDays, absences, onToggleDay, onRequest }: {
+  unavailableDays: string[]; absences: AbsenceT[];
+  onToggleDay: (date: string) => void;
+  onRequest: (type: string, startDate: string, endDate: string, note: string) => void;
+}) {
   const { t } = useLanguage();
   const [requesting, setRequesting] = useState(false);
   const [type, setType] = useState("vacation");
@@ -576,7 +606,7 @@ export function MyAbsencesView({ unavailableDays, absences, onToggleDay, onReque
       </article>
       <article className="data-card">
         <div className="card-heading"><div><h3>{t("myabsences.myRequests")}</h3></div></div>
-        {absences.map((a: any) => (
+        {absences.map((a) => (
           <div key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--line)", fontSize: 12 }}>
             <span>{absenceLabel(t, a.type)} · {a.startDate} – {a.endDate}</span>
             <em className={`status-pill ${a.status === "approved" ? "available" : a.status === "rejected" ? "away" : "transfer"}`}>{a.status === "approved" ? t("absences.approved") : a.status === "rejected" ? t("absences.rejected") : t("myabsences.statusPending")}</em>
@@ -605,11 +635,14 @@ export function MyAbsencesView({ unavailableDays, absences, onToggleDay, onReque
 }
 
 /* ---------------- Chat / automatic coverage ---------------- */
-export function ChatView({ coverage, employees, locations, currentUser, openShifts, onOpenCoverage, onAccept }: any) {
+export function ChatView({ coverage, employees, locations, currentUser, openShifts, onOpenCoverage, onAccept }: {
+  coverage: CoverageRequestT[]; employees: EmployeeT[]; locations: LocationT[]; currentUser: CurrentUser;
+  openShifts: ShiftT[]; onOpenCoverage: (shiftId: string) => void; onAccept: (id: string) => void;
+}) {
   const { t } = useLanguage();
-  const employeeName = (id: string) => employees.find((e: any) => e.id === id)?.name ?? "—";
-  const locationName = (id?: string) => locations.find((l: any) => l.id === id)?.name ?? "—";
-  const myInvites = coverage.filter((c: any) => c.candidates.some((cand: any) => cand.userId === currentUser.id));
+  const employeeName = (id: string) => employees.find((e) => e.id === id)?.name ?? "—";
+  const locationName = (id?: string) => locations.find((l) => l.id === id)?.name ?? "—";
+  const myInvites = coverage.filter((c) => c.candidates.some((cand) => cand.userId === currentUser.id));
 
   return (
     <div className="view-stack">
@@ -618,7 +651,7 @@ export function ChatView({ coverage, employees, locations, currentUser, openShif
       {currentUser.role !== "employee" && (
         <article className="data-card" style={{ marginBottom: 6 }}>
           <div className="card-heading"><div><h3>{t("chat.openShifts")}</h3><p>{t("chat.openShiftsSubtitle")}</p></div></div>
-          {openShifts.length === 0 ? <p className="empty-state">{t("chat.noOpenShifts")}</p> : openShifts.map((shift: any) => (
+          {openShifts.length === 0 ? <p className="empty-state">{t("chat.noOpenShifts")}</p> : openShifts.map((shift) => (
             <div className="transfer-route-row" key={shift.id}>
               <div className="person-summary"><span><strong>{locationName(shift.locationId)}</strong><small>{shift.date} · {shift.startTime}–{shift.endTime}</small></span></div>
               <button className="row-action" onClick={() => onOpenCoverage(shift.id)}><Send size={13} /> {t("chat.requestCoverage")}</button>
@@ -629,17 +662,17 @@ export function ChatView({ coverage, employees, locations, currentUser, openShif
 
       <div className="coverage-layout">
         <section className="chat-card" style={{ gridColumn: "1 / -1" }}>
-          <div className="chat-head"><div><span className="chat-logo"><Sparkles size={16} /></span><span><strong>{t("chat.coverageRequests")}</strong><small>{coverage.filter((c: any) => c.status === "open").length} {t("chat.open")}</small></span></div></div>
+          <div className="chat-head"><div><span className="chat-logo"><Sparkles size={16} /></span><span><strong>{t("chat.coverageRequests")}</strong><small>{coverage.filter((c) => c.status === "open").length} {t("chat.open")}</small></span></div></div>
           <div className="candidate-list">
-            {(currentUser.role === "employee" ? myInvites : coverage).map((request: any) => (
+            {(currentUser.role === "employee" ? myInvites : coverage).map((request) => (
               <article className={`candidate-message ${request.status === "closed" ? "locked" : ""}`} key={request.id}>
                 <span className="avatar violet"><AlertTriangle size={15} /></span>
                 <div>
                   <strong>{request.shift ? `${locationName(request.shift.locationId)} · ${request.shift.date}` : t("chat.shift")}</strong>
                   <span>{request.shift ? `${request.shift.startTime}–${request.shift.endTime}` : ""} · {request.reason}</span>
-                  <p>{request.status === "closed" ? t("chat.coveredBy", { name: employeeName(request.acceptedByUserId) }) : t("chat.invited", { count: request.candidates.filter((c: any) => c.status === "invited").length })}</p>
+                  <p>{request.status === "closed" ? t("chat.coveredBy", { name: employeeName(request.acceptedByUserId ?? "") }) : t("chat.invited", { count: request.candidates.filter((c) => c.status === "invited").length })}</p>
                 </div>
-                {currentUser.role === "employee" && request.status === "open" && request.candidates.some((c: any) => c.userId === currentUser.id && c.status === "invited") && (
+                {currentUser.role === "employee" && request.status === "open" && request.candidates.some((c) => c.userId === currentUser.id && c.status === "invited") && (
                   <button onClick={() => onAccept(request.id)}>{t("chat.acceptShift")}</button>
                 )}
                 {request.status === "closed" && <button disabled><LockKeyhole size={13} /> {t("chat.closed")}</button>}
@@ -654,16 +687,16 @@ export function ChatView({ coverage, employees, locations, currentUser, openShif
 }
 
 /* ---------------- Staff directory ---------------- */
-export function StaffDirectoryView({ employees, locations }: any) {
+export function StaffDirectoryView({ employees, locations }: { employees: EmployeeT[]; locations: LocationT[] }) {
   const { t } = useLanguage();
   const [query, setQuery] = useState("");
-  const locationName = (id: string | null) => locations.find((l: any) => l.id === id)?.name ?? t("team.unassigned");
-  const filtered = employees.filter((p: any) => `${p.name} ${p.occupation}`.toLowerCase().includes(query.toLowerCase()));
+  const locationName = (id: string | null) => locations.find((l) => l.id === id)?.name ?? t("team.unassigned");
+  const filtered = employees.filter((p) => `${p.name} ${p.occupation}`.toLowerCase().includes(query.toLowerCase()));
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("staff.kicker")}</span><h2>{t("staff.title")}</h2><p>{t("staff.subtitle")}</p></div><label className="directory-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("staff.search")} /></label></div>
       <section className="directory-grid">
-        {filtered.map((person: any) => (
+        {filtered.map((person) => (
           <article className="person-card" key={person.id}>
             <div className={`avatar profile-avatar ${person.color}`}>{initials(person.name)}</div>
             <div className="person-card-head"><div><h3>{person.name}</h3><span>{person.occupation}</span></div></div>
@@ -677,7 +710,10 @@ export function StaffDirectoryView({ employees, locations }: any) {
 }
 
 /* ---------------- Locations ---------------- */
-export function LocationsView({ locations, employees, currentUser, onCreate, onOpenStaff }: any) {
+export function LocationsView({ locations, employees, currentUser, onCreate, onOpenStaff }: {
+  locations: LocationT[]; employees: EmployeeT[]; currentUser: CurrentUser;
+  onCreate: (name: string) => void; onOpenStaff: () => void;
+}) {
   const { t } = useLanguage();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -687,13 +723,13 @@ export function LocationsView({ locations, employees, currentUser, onCreate, onO
         {currentUser.role !== "employee" && <button className="primary-button" onClick={() => setCreating(true)}><Store size={16} /> {t("locations.new")}</button>}
       </div>
       <section className="locations-grid">
-        {locations.map((site: any) => {
-          const staff = employees.filter((e: any) => (e.currentLocationId ?? e.homeLocationId) === site.id);
+        {locations.map((site) => {
+          const staff = employees.filter((e) => (e.currentLocationId ?? e.homeLocationId) === site.id);
           return (
             <article className="location-card" key={site.id}>
               <div className="location-card-head"><span><Store size={20} /></span><div><h3>{site.name}</h3><p>{site.address || t("locations.noAddress")}</p></div></div>
               <div className="location-hours"><Clock3 size={14} /> {site.openHours}<em>{t("locations.peopleCount", { count: staff.length })}</em></div>
-              <div className="onsite-list">{staff.length ? staff.map((person: any) => <div key={person.id}><span className={`avatar ${person.color}`}>{initials(person.name)}</span><span><strong>{person.name}</strong><small>{person.occupation}</small></span></div>) : <p>{t("locations.noStaff")}</p>}</div>
+              <div className="onsite-list">{staff.length ? staff.map((person) => <div key={person.id}><span className={`avatar ${person.color}`}>{initials(person.name)}</span><span><strong>{person.name}</strong><small>{person.occupation}</small></span></div>) : <p>{t("locations.noStaff")}</p>}</div>
               <button className="secondary-button" onClick={onOpenStaff}>{t("locations.viewTeam")} <ArrowUpRight size={14} /></button>
             </article>
           );
@@ -716,7 +752,11 @@ export function LocationsView({ locations, employees, currentUser, onCreate, onO
 }
 
 /* ---------------- Accounts ---------------- */
-export function AccountsView({ employees, locations, currentUser, onCreate, onDelete }: any) {
+export function AccountsView({ employees, locations, currentUser, onCreate, onDelete }: {
+  employees: EmployeeT[]; locations: LocationT[]; currentUser: CurrentUser;
+  onCreate: (payload: { name: string; email: string; role: string; locationId: string }) => Promise<{ temporaryPassword: string | null; emailed: boolean } | null>;
+  onDelete: (id: string) => void;
+}) {
   const { t } = useLanguage();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -730,14 +770,14 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
       <div className="view-heading"><div><span className="view-kicker">{t("accounts.kicker")}</span><h2>{t("accounts.title")}</h2><p>{t("accounts.subtitle")}</p></div><button className="primary-button" onClick={() => { setCreating(true); setResult(null); }}><UserPlus size={16} /> {t("accounts.create")}</button></div>
       <article className="data-card accounts-card">
         <div className="account-row table-head"><span>{t("accounts.colUser")}</span><span>{t("accounts.colAccess")}</span><span>{t("accounts.colLocation")}</span><span /></div>
-        {employees.map((account: any) => {
+        {employees.map((account) => {
           const protectedOwner = currentUser.role === "manager" && account.role === "owner";
           const isSelf = account.id === currentUser.id;
           return (
             <div className="account-row table-row" key={account.id}>
               <span className="person-summary"><span className={`avatar ${account.color}`}>{initials(account.name)}</span><span><strong>{account.name}</strong><small>{account.email}</small></span></span>
               <em className={`access-pill ${account.role}`}>{account.role === "owner" ? <Crown size={12} /> : account.role === "manager" ? <ShieldCheck size={12} /> : <UserCheck size={12} />}{t(`role.${account.role}`)}</em>
-              <span>{locations.find((l: any) => l.id === account.currentLocationId)?.name ?? "—"}</span>
+              <span>{locations.find((l) => l.id === account.currentLocationId)?.name ?? "—"}</span>
               <span><button className="delete-account" disabled={protectedOwner || isSelf} title={protectedOwner ? t("accounts.deleteProtected") : isSelf ? t("accounts.deleteSelf") : t("accounts.delete")} onClick={() => onDelete(account.id)}>{protectedOwner || isSelf ? <LockKeyhole size={15} /> : <Trash2 size={15} />}</button></span>
             </div>
           );
@@ -755,7 +795,7 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
                   <label><span>{t("accounts.fullName")}</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
                   <label><span>{t("accounts.email")}</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
                   <label><span>{t("accounts.access")}</span><select value={role} onChange={(e) => setRole(e.target.value)}><option value="employee">{t("role.employee")}</option><option value="manager">{t("role.manager")}</option>{currentUser.role === "owner" && <option value="owner">{t("role.owner")}</option>}</select></label>
-                  <label><span>{t("accounts.location")}</span><select value={locationId} onChange={(e) => setLocationId(e.target.value)}>{locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+                  <label><span>{t("accounts.location")}</span><select value={locationId} onChange={(e) => setLocationId(e.target.value)}>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
                 </div>
                 <div className="modal-account-actions">
                   <button className="secondary-button" onClick={() => setCreating(false)}>{t("accounts.cancel")}</button>
@@ -777,10 +817,15 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
 }
 
 /* ---------------- Settings ---------------- */
-export function SettingsView({ permissions, onToggle, organization, locations, onUpdateOrgLogo, onUpdateLocationLogo }: any) {
+export function SettingsView({ permissions, onToggle, organization, locations, onUpdateOrgLogo, onUpdateLocationLogo }: {
+  permissions: PermissionsT; onToggle: (key: keyof PermissionsT) => void;
+  organization: OrgT | null; locations: LocationT[];
+  onUpdateOrgLogo: (logoUrl: string | null) => void;
+  onUpdateLocationLogo: (locationId: string, logoUrl: string | null) => void;
+}) {
   const { t, lang, setLang } = useLanguage();
   const [logoError, setLogoError] = useState<string | null>(null);
-  const rows: [string, string, string][] = [
+  const rows: [keyof PermissionsT, string, string][] = [
     ["approveLeave", t("settings.approveLeave"), t("settings.managersOwners")],
     ["moveEmployees", t("settings.moveEmployees"), t("settings.managersOwners")],
     ["editPublished", t("settings.editPublished"), t("settings.managersOwners")],
@@ -834,7 +879,7 @@ export function SettingsView({ permissions, onToggle, organization, locations, o
             </div>
           </div>
 
-          {locations.map((site: any) => (
+          {locations.map((site) => (
             <div className="logo-uploader-row" key={site.id}>
               <div className="logo-preview">{site.logoUrl ? <img src={site.logoUrl} alt="" /> : <Store size={18} />}</div>
               <div className="logo-uploader-actions">
@@ -857,9 +902,12 @@ export function SettingsView({ permissions, onToggle, organization, locations, o
 }
 
 /* ---------------- Transfer modal ---------------- */
-export function TransferModal({ employee, locations, onClose, onConfirm }: any) {
+export function TransferModal({ employee, locations, onClose, onConfirm }: {
+  employee: EmployeeT; locations: LocationT[]; onClose: () => void;
+  onConfirm: (toLocationId: string, type: string, startDate: string) => void;
+}) {
   const { t } = useLanguage();
-  const [toLocationId, setToLocationId] = useState(locations.find((l: any) => l.id !== employee.currentLocationId)?.id ?? locations[0]?.id ?? "");
+  const [toLocationId, setToLocationId] = useState(locations.find((l) => l.id !== employee.currentLocationId)?.id ?? locations[0]?.id ?? "");
   const [type, setType] = useState("temporary");
   const [startDate, setStartDate] = useState(todayISO());
   return (
@@ -872,7 +920,7 @@ export function TransferModal({ employee, locations, onClose, onConfirm }: any) 
         <p>{t("transferModal.body")}</p>
         <div className="transfer-form">
           <label><span>{t("transferModal.type")}</span><select value={type} onChange={(e) => setType(e.target.value)}><option value="temporary">{t("transfers.temporary")}</option><option value="permanent">{t("transfers.permanent")}</option></select></label>
-          <label><span>{t("transferModal.destination")}</span><select value={toLocationId} onChange={(e) => setToLocationId(e.target.value)}>{locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+          <label><span>{t("transferModal.destination")}</span><select value={toLocationId} onChange={(e) => setToLocationId(e.target.value)}>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
           <div className="date-fields"><label><span>{t("transferModal.from")}</span><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label></div>
         </div>
         <button className="primary-button modal-action" onClick={() => onConfirm(toLocationId, type, startDate)} disabled={!toLocationId}><Check size={16} /> {t("transferModal.confirm")}</button>
