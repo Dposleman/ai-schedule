@@ -1,5 +1,9 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import * as schema from "./schema";
 
 declare global {
@@ -47,190 +51,64 @@ export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
   },
 });
 
-let migrated = false;
+
+const MIGRATIONS_FOLDER = path.join(process.cwd(), "drizzle");
+const MIGRATIONS_SCHEMA = "drizzle";
+const MIGRATIONS_TABLE = "__drizzle_migrations";
+
+let migrated: Promise<void> | null = null;
+
+/**
+ * Applies pending Drizzle migrations (see ./drizzle/*.sql) to the database,
+ * lazily and once per warm instance — same call sites and same guarantee as
+ * the old hand-written ensureSchema() this replaces (every request path that
+ * touches the DB before a session exists calls this first).
+ *
+ * Production and any other database that was bootstrapped by the *old*
+ * runtime ensureSchema() (raw CREATE TABLE IF NOT EXISTS on every cold
+ * start, no migration history) already has every table 0000_baseline.sql
+ * would create. Re-running that file against it would fail on "relation
+ * already exists". So on first run against such a database we adopt it:
+ * we record 0000_baseline as already applied (matching its actual state)
+ * without executing it, then let the normal migrator run only what's
+ * genuinely new (0001+). A brand-new database has none of these tables yet,
+ * so it just runs every migration from 0000 forward, same as any fresh
+ * Drizzle project.
+ */
 export async function ensureSchema() {
-  if (migrated) return;
-  migrated = true;
-  await getPool().query(`
-    CREATE TABLE IF NOT EXISTS organizations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      logo_url TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS logo_url TEXT;
+  if (!migrated) migrated = runMigrations();
+  return migrated;
+}
 
-    CREATE TABLE IF NOT EXISTS locations (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      address TEXT NOT NULL DEFAULT '',
-      open_hours TEXT NOT NULL DEFAULT '08:00–23:00',
-      latitude DOUBLE PRECISION NOT NULL DEFAULT 55.6761,
-      longitude DOUBLE PRECISION NOT NULL DEFAULT 12.5683,
-      radius_meters INTEGER NOT NULL DEFAULT 50,
-      budget_cents INTEGER NOT NULL DEFAULT 0,
-      logo_url TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-    ALTER TABLE locations ADD COLUMN IF NOT EXISTS logo_url TEXT;
+async function runMigrations() {
+  const pool = getPool();
 
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'employee',
-      occupation TEXT NOT NULL DEFAULT '',
-      phone TEXT NOT NULL DEFAULT '',
-      color TEXT NOT NULL DEFAULT 'blue',
-      home_location_id TEXT,
-      current_location_id TEXT,
-      hourly_rate_cents INTEGER NOT NULL DEFAULT 0,
-      weekly_hour_target INTEGER NOT NULL DEFAULT 0,
-      language TEXT NOT NULL DEFAULT 'en',
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en';
-
-    CREATE TABLE IF NOT EXISTS shifts (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      location_id TEXT NOT NULL,
-      user_id TEXT,
-      date TEXT NOT NULL,
-      start_time TEXT NOT NULL,
-      end_time TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'scheduled',
-      ai_generated INTEGER NOT NULL DEFAULT 0,
-      published INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS absence_requests (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'vacation',
-      start_date TEXT NOT NULL,
-      end_date TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending',
-      note TEXT NOT NULL DEFAULT '',
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS unavailability (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      date TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS transfers (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      from_location_id TEXT NOT NULL,
-      to_location_id TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'temporary',
-      start_date TEXT NOT NULL,
-      end_date TEXT,
-      status TEXT NOT NULL DEFAULT 'active',
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS coverage_requests (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      shift_id TEXT NOT NULL,
-      reason TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'open',
-      accepted_by_user_id TEXT,
-      escalated INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-    ALTER TABLE coverage_requests ADD COLUMN IF NOT EXISTS escalated INTEGER NOT NULL DEFAULT 0;
-
-    CREATE TABLE IF NOT EXISTS coverage_candidates (
-      id TEXT PRIMARY KEY,
-      request_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      match_score INTEGER NOT NULL DEFAULT 90,
-      status TEXT NOT NULL DEFAULT 'invited'
-    );
-
-    CREATE TABLE IF NOT EXISTS daily_tasks (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      location_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      owner_user_id TEXT,
-      due_time TEXT NOT NULL DEFAULT '09:00',
-      date TEXT NOT NULL,
-      automatic INTEGER NOT NULL DEFAULT 0,
-      completed INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS attendance (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      shift_id TEXT,
-      user_id TEXT NOT NULL,
-      check_in_at TEXT,
-      check_out_at TEXT,
-      auto_checkout INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'info',
-      title TEXT NOT NULL,
-      body TEXT NOT NULL DEFAULT '',
-      entity_id TEXT,
-      read_at TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-    CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications (user_id);
-
-    CREATE TABLE IF NOT EXISTS permissions (
-      org_id TEXT PRIMARY KEY,
-      approve_leave INTEGER NOT NULL DEFAULT 1,
-      move_employees INTEGER NOT NULL DEFAULT 1,
-      edit_published INTEGER NOT NULL DEFAULT 1,
-      override_ai INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS password_reset_tokens (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      token_hash TEXT NOT NULL,
-      expires_at TIMESTAMP NOT NULL,
-      used_at TIMESTAMP,
-      created_at TIMESTAMP NOT NULL DEFAULT now()
-    );
-    CREATE INDEX IF NOT EXISTS password_reset_tokens_user_id_idx ON password_reset_tokens (user_id);
-
-    -- One open (not-yet-checked-out) attendance session per person: stops a
-    -- double-tapped "clock in" from creating two overlapping paid sessions.
-    CREATE UNIQUE INDEX IF NOT EXISTS attendance_open_session_idx ON attendance (user_id) WHERE check_out_at IS NULL;
-
-    -- Every list view is scoped to one organization (multi-tenant) or one
-    -- person's own records — these back exactly those lookups.
-    CREATE INDEX IF NOT EXISTS users_org_id_idx ON users (org_id);
-    CREATE INDEX IF NOT EXISTS shifts_org_id_date_idx ON shifts (org_id, date);
-    CREATE INDEX IF NOT EXISTS shifts_user_id_date_idx ON shifts (user_id, date);
-    CREATE INDEX IF NOT EXISTS absence_requests_org_id_idx ON absence_requests (org_id);
-    CREATE INDEX IF NOT EXISTS unavailability_user_id_date_idx ON unavailability (user_id, date);
-    CREATE INDEX IF NOT EXISTS transfers_org_id_idx ON transfers (org_id);
-    CREATE INDEX IF NOT EXISTS coverage_requests_org_id_idx ON coverage_requests (org_id);
-    CREATE INDEX IF NOT EXISTS coverage_candidates_request_id_idx ON coverage_candidates (request_id);
-    CREATE INDEX IF NOT EXISTS coverage_candidates_user_id_idx ON coverage_candidates (user_id);
-    CREATE INDEX IF NOT EXISTS daily_tasks_org_id_date_idx ON daily_tasks (org_id, date);
-    CREATE INDEX IF NOT EXISTS attendance_user_id_idx ON attendance (user_id);
-    CREATE INDEX IF NOT EXISTS attendance_org_id_idx ON attendance (org_id);
+  await pool.query(`CREATE SCHEMA IF NOT EXISTS "${MIGRATIONS_SCHEMA}"`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" (
+      id SERIAL PRIMARY KEY,
+      hash text NOT NULL,
+      created_at bigint
+    )
   `);
+
+  const { rows: tracked } = await pool.query(
+    `SELECT 1 FROM "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" LIMIT 1`
+  );
+  if (tracked.length === 0) {
+    const { rows: existingTables } = await pool.query(`SELECT to_regclass('public.organizations') AS reg`);
+    const isPreExistingDatabase = existingTables[0]?.reg !== null;
+    if (isPreExistingDatabase) {
+      const journal = JSON.parse(fs.readFileSync(path.join(MIGRATIONS_FOLDER, "meta", "_journal.json"), "utf-8"));
+      const baselineEntry = journal.entries[0];
+      const baselineSql = fs.readFileSync(path.join(MIGRATIONS_FOLDER, `${baselineEntry.tag}.sql`), "utf-8");
+      const hash = crypto.createHash("sha256").update(baselineSql).digest("hex");
+      await pool.query(
+        `INSERT INTO "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" (hash, created_at) VALUES ($1, $2)`,
+        [hash, baselineEntry.when]
+      );
+    }
+  }
+
+  await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER, migrationsSchema: MIGRATIONS_SCHEMA, migrationsTable: MIGRATIONS_TABLE });
 }

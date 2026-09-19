@@ -29,6 +29,6 @@ export const POST = withRoute(async (request: NextRequest) => {
     return NextResponse.json({ ok: true, blocked: false });
   }
 
-  await db.insert(unavailability).values({ id: newId("unavail"), userId: user.id, date: body.date });
+  await db.insert(unavailability).values({ id: newId("unavail"), orgId: user.orgId, userId: user.id, date: body.date });
   return NextResponse.json({ ok: true, blocked: true });
 });

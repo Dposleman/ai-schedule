@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { locations, users, shifts, dailyTasks } from "@/db/schema";
+import { locations, users, shifts, dailyTasks, transfers } from "@/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { requireUser, requireRole, notFound, badRequest, withRoute } from "@/lib/api";
 
@@ -64,6 +64,18 @@ export const DELETE = withRoute(async (_request: NextRequest, { params }: { para
   const [pendingTask] = await db.select().from(dailyTasks).where(eq(dailyTasks.locationId, id)).limit(1);
   if (pendingTask) {
     return NextResponse.json({ error: "This location still has daily tasks assigned — remove them first." }, { status: 409 });
+  }
+
+  // Transfer records (even completed ones) reference this location and can't
+  // be reassigned — unlike shifts/tasks, there's nothing to "remove first",
+  // so a location with any transfer history can never be deleted, only kept.
+  const [linkedTransfer] = await db
+    .select()
+    .from(transfers)
+    .where(or(eq(transfers.fromLocationId, id), eq(transfers.toLocationId, id)))
+    .limit(1);
+  if (linkedTransfer) {
+    return NextResponse.json({ error: "This location has transfer history and can't be deleted." }, { status: 409 });
   }
 
   await db.delete(locations).where(eq(locations.id, id));
