@@ -1,0 +1,35 @@
+name: CI
+
+# Safety net, not a gate: runs the same checks locally run before every push
+# (typecheck, lint, build) automatically on GitHub after each push to main,
+# so a mistake shows up as a red check here instead of only in Vercel's
+# build logs or in production. It does not block the push — main isn't
+# branch-protected, so this is purely a passive "did that actually still
+# work" signal.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
