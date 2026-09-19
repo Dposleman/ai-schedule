@@ -11,11 +11,12 @@ const ESCALATE_AFTER_MS = 60 * 60 * 1000; // 1 hour, per the "call them yourself
 // off Vercel Cron, which on the Hobby plan only allows once-a-day schedules)
 // — not tied to any one user's session, so it can't reuse requireUser().
 // The workflow sends this header when CRON_SECRET is configured as a repo
-// secret; when it isn't set (e.g. running locally) the check is skipped so
-// local testing still works.
+// secret. In production a missing secret must fail closed — otherwise
+// anyone who finds this URL can trigger it unauthenticated — so only local
+// development (no CRON_SECRET *and* not running on Vercel) skips the check.
 function isAuthorized(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) return !process.env.VERCEL;
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 

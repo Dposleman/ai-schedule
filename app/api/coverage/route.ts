@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
 import { coverageRequests, coverageCandidates, shifts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { openCoverageForShift } from "@/lib/coverage";
 import { parseBody, zId } from "@/lib/validation";
@@ -11,7 +11,11 @@ export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
   if (error) return error;
   const requests = await db.select().from(coverageRequests).where(eq(coverageRequests.orgId, user.orgId));
-  const candidates = await db.select().from(coverageCandidates);
+  // Scoped to this org's own request IDs instead of pulling every org's
+  // candidate rows into memory and filtering client-side in JS.
+  const candidates = requests.length
+    ? await db.select().from(coverageCandidates).where(inArray(coverageCandidates.requestId, requests.map((r) => r.id)))
+    : [];
   const shiftRows = await db.select().from(shifts).where(eq(shifts.orgId, user.orgId));
 
   const enriched = requests.map((request) => ({

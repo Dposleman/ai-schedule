@@ -38,21 +38,27 @@ export const POST = withRoute(async (request: NextRequest) => {
   const locationId = newId("loc");
   const userId = newId("user");
 
-  await db.insert(organizations).values({ id: orgId, name: businessName });
-  await db.insert(locations).values({ id: locationId, orgId, name: locationName });
-  await db.insert(users).values({
-    id: userId,
-    orgId,
-    name,
-    email,
-    passwordHash: hashPassword(password),
-    role: "owner",
-    occupation: "Owner",
-    color: "pink",
-    homeLocationId: locationId,
-    currentLocationId: locationId,
+  // All four rows are one logical "create an organization" operation — if
+  // any insert fails partway through (a constraint violation, a dropped
+  // connection), the transaction rolls back the whole thing instead of
+  // leaving an org with no owner, or a user with no permissions row.
+  await db.transaction(async (tx) => {
+    await tx.insert(organizations).values({ id: orgId, name: businessName });
+    await tx.insert(locations).values({ id: locationId, orgId, name: locationName });
+    await tx.insert(users).values({
+      id: userId,
+      orgId,
+      name,
+      email,
+      passwordHash: hashPassword(password),
+      role: "owner",
+      occupation: "Owner",
+      color: "pink",
+      homeLocationId: locationId,
+      currentLocationId: locationId,
+    });
+    await tx.insert(permissions).values({ orgId });
   });
-  await db.insert(permissions).values({ orgId });
 
   await setSessionCookie(userId);
   return NextResponse.json({ ok: true });
