@@ -14,7 +14,7 @@ type Dict = Record<string, string>;
 
 const en: Dict = {
   // App
-  "app.name": "AI Schedule",
+  "app.name": "UnderStack Shift",
   "app.tagline": "Smart shift planning for multi-location teams.",
 
   // Roles
@@ -420,11 +420,11 @@ const en: Dict = {
   "error.retry": "Try again",
   "notFound.title": "Page not found",
   "notFound.subtitle": "That page doesn't exist or may have moved.",
-  "notFound.backHome": "Back to AI Schedule",
+  "notFound.backHome": "Back to UnderStack Shift",
 };
 
 const da: Dict = {
-  "app.name": "AI Schedule",
+  "app.name": "UnderStack Shift",
   "app.tagline": "Smart vagtplanlægning til teams med flere lokationer.",
 
   "role.owner": "Ejer",
@@ -808,7 +808,7 @@ const da: Dict = {
   "error.retry": "Prøv igen",
   "notFound.title": "Siden blev ikke fundet",
   "notFound.subtitle": "Den side findes ikke eller er måske blevet flyttet.",
-  "notFound.backHome": "Tilbage til AI Schedule",
+  "notFound.backHome": "Tilbage til UnderStack Shift",
 };
 
 export const DICTS: Record<Lang, Dict> = { en, da };

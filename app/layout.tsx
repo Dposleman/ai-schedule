@@ -3,7 +3,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/app/language-context";
 
 export const metadata: Metadata = {
-  title: "AI Schedule",
+  title: "UnderStack Shift",
   description: "Smart shift planning for multi-location teams.",
   icons: {
     icon: "/favicon.svg",

@@ -1,11 +1,14 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
+  // appId intentionally left unchanged — it's the Android package identity
+  // (signing, any future Play Store listing); renaming it is a separate,
+  // deliberate migration, not part of a visual rebrand.
   appId: "com.aischedule.mobile",
-  appName: "AI Schedule",
+  appName: "UnderStack Shift",
   webDir: "mobile-dist",
   android: {
-    backgroundColor: "#f7f6fb",
+    backgroundColor: "#F4F3F0",
   },
   plugins: {
     SystemBars: {
