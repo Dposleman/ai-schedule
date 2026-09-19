@@ -25,7 +25,8 @@ export type Capability =
   | "coverage.manage"
   | "tasks.manage"
   | "permissions.manage"
-  | "audit.view";
+  | "audit.view"
+  | "billing.manage";
 
 export type OrgPermissions = {
   approveLeave: number;
@@ -39,7 +40,11 @@ export type OrgPermissions = {
 // audit.view is here rather than in MANAGER_BASE deliberately: the audit
 // log's whole point is accountability for what managers themselves did, so
 // it isn't something a manager can grant themselves access to.
-const OWNER_ONLY = new Set<Capability>(["locations.delete", "permissions.manage", "audit.view"]);
+// billing.manage is owner-only per the master prompt ("Billing management
+// limited to owner or explicit billing-admin capability") — there's no
+// separate billing-admin role in this app yet, so owner-only is the safe
+// default until one is introduced.
+const OWNER_ONLY = new Set<Capability>(["locations.delete", "permissions.manage", "audit.view", "billing.manage"]);
 
 // Capabilities a manager has unconditionally — not gated by the org's
 // configurable toggles below.

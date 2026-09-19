@@ -36,6 +36,13 @@
       "when": 1789851361667,
       "tag": "0004_operational_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789853203825,
+      "tag": "0005_billing_entitlements",
+      "breakpoints": true
     }
   ]
 }

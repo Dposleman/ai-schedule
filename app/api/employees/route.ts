@@ -9,6 +9,7 @@ import { sendWelcomeEmail } from "@/lib/email";
 import { organizations } from "@/db/schema";
 import { parseBody, zEmail, zId, zText } from "@/lib/validation";
 import { recordAuditEvent } from "@/lib/audit";
+import { checkSeatLimit } from "@/lib/billing";
 import crypto from "node:crypto";
 
 export const GET = withRoute(async () => {
@@ -50,6 +51,11 @@ export const POST = withRoute(async (request: NextRequest) => {
   const { data, error: validationError } = await parseBody(request, createEmployeeSchema);
   if (validationError) return validationError;
   const { name, email, role } = data;
+
+  // Server-side enforcement, not a disabled button — the plan's seat limit
+  // is checked here regardless of what the client sent or showed.
+  const seatCheck = await checkSeatLimit(user.orgId);
+  if (!seatCheck.ok) return badRequest(seatCheck.message);
 
   if (role === "owner" && user.role !== "owner") {
     return NextResponse.json({ error: "Only an owner can create another owner." }, { status: 403 });

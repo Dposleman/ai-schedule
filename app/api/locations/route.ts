@@ -3,10 +3,11 @@ import { z } from "zod";
 import { db } from "@/db";
 import { locations } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireUser, requireCapability, withRoute } from "@/lib/api";
+import { requireUser, requireCapability, badRequest, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { parseBody, zText } from "@/lib/validation";
 import { recordAuditEvent } from "@/lib/audit";
+import { checkLocationLimit } from "@/lib/billing";
 
 const numberOr = (fallback: number) => z.coerce.number().optional().transform((value) => (value === undefined || Number.isNaN(value) ? fallback : value));
 
@@ -42,6 +43,9 @@ export const POST = withRoute(async (request: NextRequest) => {
 
   const { data, error: validationError } = await parseBody(request, createLocationSchema);
   if (validationError) return validationError;
+
+  const locationCheck = await checkLocationLimit(user.orgId);
+  if (!locationCheck.ok) return badRequest(locationCheck.message);
 
   const id = newId("loc");
   await db.insert(locations).values({

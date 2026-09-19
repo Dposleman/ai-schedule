@@ -222,3 +222,36 @@ export const permissions = pgTable("permissions", {
   editPublished: integer("edit_published").notNull().default(1),
   overrideAI: integer("override_ai").notNull().default(0),
 });
+
+// One row per organization, created at signup alongside `permissions`.
+// planKey/subscriptionStatus are server-authoritative — nothing in the UI
+// ever grants access on its own; a route checks this table (via
+// lib/billing.ts) before allowing a paid feature or a limited create.
+// No Stripe wiring yet (Phase 5 architecture step): billingCustomerId /
+// billingSubscriptionId / currentPeriodEnd / cancelAtPeriodEnd stay null
+// until checkout+webhooks are implemented, at which point they start
+// getting written from verified Stripe events — never from a client
+// request or a success-redirect.
+export const billing = pgTable("billing", {
+  orgId: text("org_id").primaryKey().references(() => organizations.id, { onDelete: "cascade" }),
+  // Stable internal plan key (see lib/plans.ts) — never a raw provider
+  // product/price id, so pricing/provider can change without touching
+  // every row or every entitlement check.
+  planKey: text("plan_key").notNull().default("starter"),
+  // trialing | active | past_due | canceled | unpaid | trial_expired
+  subscriptionStatus: text("subscription_status").notNull().default("trialing"),
+  trialStartedAt: timestamp("trial_started_at", { mode: "string" }).notNull().defaultNow(),
+  trialEndsAt: timestamp("trial_ends_at", { mode: "string" }).notNull().defaultNow(),
+  billingCustomerId: text("billing_customer_id"),
+  billingSubscriptionId: text("billing_subscription_id"),
+  currentPeriodEnd: timestamp("current_period_end", { mode: "string" }),
+  cancelAtPeriodEnd: integer("cancel_at_period_end").notNull().default(0),
+  // Set when a trial/subscription lapses instead of deleting anything —
+  // the org's data stays intact and readable, writes get gated off (see
+  // lib/billing.ts isRestricted) until payment resumes.
+  gracePeriodEndsAt: timestamp("grace_period_ends_at", { mode: "string" }),
+  seatLimit: integer("seat_limit").notNull().default(10),
+  locationLimit: integer("location_limit").notNull().default(1),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow(),
+});

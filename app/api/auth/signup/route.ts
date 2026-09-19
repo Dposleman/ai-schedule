@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, ensureSchema } from "@/db";
-import { organizations, users, locations, permissions } from "@/db/schema";
+import { organizations, users, locations, permissions, billing } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, newId, setSessionCookie } from "@/lib/auth";
 import { badRequest, withRoute } from "@/lib/api";
 import { parseBody, zEmail, zText } from "@/lib/validation";
 import { isRateLimited, clientIp } from "@/lib/rate-limit";
+import { DEFAULT_TRIAL_DAYS } from "@/lib/plans";
 
 const signupSchema = z.object({
   businessName: zText(200),
@@ -58,6 +59,20 @@ export const POST = withRoute(async (request: NextRequest) => {
       currentLocationId: locationId,
     });
     await tx.insert(permissions).values({ orgId });
+
+    // Every new org starts on a free trial — Starter limits, no card
+    // required. planKey/limits only change once billing is actually wired
+    // to Stripe and the owner picks/pays for a plan; until then this is
+    // just the entitlement bookkeeping, not a real subscription.
+    const now = new Date();
+    const trialEndsAt = new Date(now.getTime() + DEFAULT_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    await tx.insert(billing).values({
+      orgId,
+      planKey: "starter",
+      subscriptionStatus: "trialing",
+      trialStartedAt: now.toISOString(),
+      trialEndsAt: trialEndsAt.toISOString(),
+    });
   });
 
   await setSessionCookie(userId);

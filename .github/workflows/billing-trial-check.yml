@@ -1,0 +1,21 @@
+name: Billing trial check
+
+# Marks any org whose free trial has run out as trial_expired instead of
+# leaving it silently "trialing" forever. A few times a day is plenty — this
+# is bookkeeping (see app/api/cron/billing-trial-check), not something that
+# needs minute-level precision.
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call billing-trial-check endpoint
+        run: |
+          curl -sS -f "https://ai-schedule-alpha.vercel.app/api/cron/billing-trial-check" \
+            ${CRON_SECRET:+-H "Authorization: Bearer $CRON_SECRET"}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
