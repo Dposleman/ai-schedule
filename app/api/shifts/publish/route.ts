@@ -5,6 +5,7 @@ import { shifts } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { requireUser, requireCapability, withRoute } from "@/lib/api";
 import { parseBody, zDate } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 const publishSchema = z.object({ weekStart: zDate, weekEnd: zDate });
 
@@ -21,6 +22,11 @@ export const POST = withRoute(async (request: NextRequest) => {
     .update(shifts)
     .set({ published: 1 })
     .where(and(eq(shifts.orgId, user.orgId), gte(shifts.date, data.weekStart), lte(shifts.date, data.weekEnd)));
+
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "shift.publish", "schedule_week", data.weekStart, {
+    weekStart: data.weekStart,
+    weekEnd: data.weekEnd,
+  });
 
   return NextResponse.json({ ok: true });
 });

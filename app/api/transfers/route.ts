@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { parseBody, zDate, zId } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
@@ -65,6 +66,12 @@ export const POST = withRoute(async (request: NextRequest) => {
       homeLocationId: data.type === "permanent" ? data.toLocationId : target.homeLocationId,
     })
     .where(eq(users.id, data.userId));
+
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "transfer.create", "transfer", id, {
+    userId: data.userId,
+    toLocationId: data.toLocationId,
+    type: data.type,
+  });
 
   return NextResponse.json({ ok: true, id });
 });

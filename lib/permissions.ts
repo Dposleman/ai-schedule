@@ -23,7 +23,8 @@ export type Capability =
   | "schedule.override_ai"
   | "absences.approve"
   | "coverage.manage"
-  | "permissions.manage";
+  | "permissions.manage"
+  | "audit.view";
 
 export type OrgPermissions = {
   approveLeave: number;
@@ -34,7 +35,10 @@ export type OrgPermissions = {
 
 // Capabilities only the org's owner ever has, regardless of the org's
 // configurable permissions row.
-const OWNER_ONLY = new Set<Capability>(["locations.delete", "permissions.manage"]);
+// audit.view is here rather than in MANAGER_BASE deliberately: the audit
+// log's whole point is accountability for what managers themselves did, so
+// it isn't something a manager can grant themselves access to.
+const OWNER_ONLY = new Set<Capability>(["locations.delete", "permissions.manage", "audit.view"]);
 
 // Capabilities a manager has unconditionally — not gated by the org's
 // configurable toggles below.

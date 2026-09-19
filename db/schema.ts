@@ -183,6 +183,26 @@ export const sessions = pgTable("sessions", {
   revokedAt: timestamp("revoked_at", { mode: "string" }),
 });
 
+// Append-only log of who did what to the org's data, and when — shift
+// reassignments, employee/location changes, absence decisions, permission
+// changes. Nothing in the app ever updates or deletes a row here; it exists
+// purely for traceability and disputes ("who approved this?", "who moved
+// my shift?"). actorName is a snapshot taken at write time (in addition to
+// the actorUserId FK) so an entry still reads sensibly after the actor
+// themselves is later deleted from the org.
+export const auditEvents = pgTable("audit_events", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  actorName: text("actor_name").notNull().default(""),
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull().default(""),
+  // Small free-form JSON-encoded context (e.g. {"name":"...", "from":"...", "to":"..."}) — not a full diff, just enough to explain the entry without a second lookup.
+  metadata: text("metadata").notNull().default("{}"),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+});
+
 export const permissions = pgTable("permissions", {
   orgId: text("org_id").primaryKey().references(() => organizations.id, { onDelete: "cascade" }),
   approveLeave: integer("approve_leave").notNull().default(1),

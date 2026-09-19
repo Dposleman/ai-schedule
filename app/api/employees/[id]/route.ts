@@ -5,6 +5,7 @@ import { users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { parseBody, zId } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 const patchEmployeeSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
@@ -48,6 +49,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   if (data.role !== undefined && user.role === "owner" && !isSelf) patch.role = data.role;
 
   await db.update(users).set(patch).where(eq(users.id, id));
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "employee.update", "user", id, patch);
   return NextResponse.json({ ok: true });
 });
 
@@ -68,5 +70,9 @@ export const DELETE = withRoute(async (_request: NextRequest, { params }: { para
   }
 
   await db.delete(users).where(eq(users.id, id));
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "employee.delete", "user", id, {
+    name: target.name,
+    email: target.email,
+  });
   return NextResponse.json({ ok: true });
 });

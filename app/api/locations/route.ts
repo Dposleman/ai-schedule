@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { requireUser, requireCapability, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { parseBody, zText } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 const numberOr = (fallback: number) => z.coerce.number().optional().transform((value) => (value === undefined || Number.isNaN(value) ? fallback : value));
 
@@ -46,6 +47,9 @@ export const POST = withRoute(async (request: NextRequest) => {
     longitude: data.longitude,
     radiusMeters: data.radiusMeters,
     budgetCents: Math.round(data.budget * 100),
+  });
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "location.create", "location", id, {
+    name: data.name,
   });
   return NextResponse.json({ ok: true, id });
 });

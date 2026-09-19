@@ -7,6 +7,7 @@ import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { openCoverageForShift } from "@/lib/coverage";
 import { notify } from "@/lib/notifications";
 import { parseBody } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 const decideAbsenceSchema = z.object({ status: z.enum(["approved", "rejected"], { error: "Invalid status." }) });
 
@@ -24,6 +25,12 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   if (!existing) return notFound("Request not found.");
 
   await db.update(absenceRequests).set({ status: body.status }).where(eq(absenceRequests.id, id));
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "absence.decide", "absence_request", id, {
+    status: body.status,
+    userId: existing.userId,
+    startDate: existing.startDate,
+    endDate: existing.endDate,
+  });
 
   await notify({
     orgId: user.orgId,

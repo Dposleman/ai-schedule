@@ -5,6 +5,7 @@ import { permissions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireUser, requireCapability, withRoute } from "@/lib/api";
 import { parseBody } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 export const GET = withRoute(async () => {
   const { user, error } = await requireUser();
@@ -35,5 +36,6 @@ export const PATCH = withRoute(async (request: NextRequest) => {
   }
 
   await db.update(permissions).set(patch).where(eq(permissions.orgId, user.orgId));
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "permissions.update", "organization", user.orgId, patch);
   return NextResponse.json({ ok: true });
 });

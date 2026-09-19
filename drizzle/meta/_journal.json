@@ -22,6 +22,13 @@
       "when": 1789806036844,
       "tag": "0002_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789809836382,
+      "tag": "0003_audit_events",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import { transfers, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { parseBody } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 const patchTransferSchema = z.object({ status: z.enum(["completed"]).optional() });
 
@@ -23,6 +24,9 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   if (data.status === "completed") {
     await db.update(transfers).set({ status: "completed" }).where(eq(transfers.id, id));
     await db.update(users).set({ currentLocationId: existing.fromLocationId }).where(eq(users.id, existing.userId));
+    await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "transfer.complete", "transfer", id, {
+      userId: existing.userId,
+    });
   }
   return NextResponse.json({ ok: true });
 });

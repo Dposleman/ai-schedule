@@ -5,6 +5,7 @@ import { locations, users, shifts, dailyTasks, transfers } from "@/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, withRoute } from "@/lib/api";
 import { parseBody, zDataUriImage } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 const MAX_LOGO_BYTES = 600_000;
 
@@ -43,6 +44,11 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   if (!existing) return notFound("Location not found.");
 
   await db.update(locations).set(patch).where(eq(locations.id, id));
+  const { logoUrl: _loggedLogoUrl, ...patchForLog } = patch;
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "location.update", "location", id, {
+    ...patchForLog,
+    logoUrlChanged: data.logoUrl !== undefined,
+  });
   return NextResponse.json({ ok: true });
 });
 
@@ -87,5 +93,8 @@ export const DELETE = withRoute(async (_request: NextRequest, { params }: { para
   }
 
   await db.delete(locations).where(eq(locations.id, id));
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "location.delete", "location", id, {
+    name: existing.name,
+  });
   return NextResponse.json({ ok: true });
 });

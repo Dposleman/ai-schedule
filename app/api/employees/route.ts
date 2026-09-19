@@ -8,6 +8,7 @@ import { hashPassword, newId } from "@/lib/auth";
 import { sendWelcomeEmail } from "@/lib/email";
 import { organizations } from "@/db/schema";
 import { parseBody, zEmail, zId, zText } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 import crypto from "node:crypto";
 
 export const GET = withRoute(async () => {
@@ -67,6 +68,12 @@ export const POST = withRoute(async (request: NextRequest) => {
     currentLocationId: data.locationId || user.currentLocationId,
     hourlyRateCents: Math.round(data.hourlyRate * 100),
     weeklyHourTarget: data.weeklyHourTarget,
+  });
+
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "employee.create", "user", id, {
+    name,
+    email,
+    role,
   });
 
   const [org] = await db.select().from(organizations).where(eq(organizations.id, user.orgId)).limit(1);

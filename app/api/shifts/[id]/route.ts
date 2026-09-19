@@ -5,6 +5,7 @@ import { shifts } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
 import { parseBody, zId, zTime } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return aStart < bEnd && bStart < aEnd;
@@ -71,6 +72,10 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   }
 
   await db.update(shifts).set(patch).where(eq(shifts.id, id));
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "shift.update", "shift", id, {
+    date: existing.date,
+    ...patch,
+  });
   return NextResponse.json({ ok: true });
 });
 
@@ -86,5 +91,9 @@ export const DELETE = withRoute(async (_request: NextRequest, { params }: { para
   if (permissionError) return permissionError;
 
   await db.delete(shifts).where(and(eq(shifts.id, id), eq(shifts.orgId, user.orgId)));
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "shift.delete", "shift", id, {
+    date: existing.date,
+    userId: existing.userId,
+  });
   return NextResponse.json({ ok: true });
 });
