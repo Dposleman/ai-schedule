@@ -11,7 +11,15 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 // listed here since dev builds should point at a local API instead. An extra
 // allowlist can be supplied via ALLOWED_MOBILE_ORIGINS (comma-separated) for
 // anything unusual without a redeploy of this file.
-const DEFAULT_MOBILE_ORIGINS = ["https://localhost", "capacitor://localhost", "ionic://localhost"];
+// Capacitor can use either HTTPS or HTTP for its local Android WebView
+// origin, depending on the installed runtime/configuration. Both variants
+// are native-app origins; accepting both keeps login working after a normal
+// Capacitor upgrade without opening CORS to arbitrary websites.
+const DEFAULT_MOBILE_ORIGINS = [
+  "https://localhost", "http://localhost",
+  "capacitor://localhost", "http://capacitor.localhost", "https://capacitor.localhost",
+  "ionic://localhost",
+];
 const EXTRA_MOBILE_ORIGINS = (process.env.ALLOWED_MOBILE_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())
