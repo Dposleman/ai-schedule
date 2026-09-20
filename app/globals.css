@@ -121,9 +121,9 @@ button { color: inherit; font: inherit; }
 .app-shell { min-height: 100vh; background: var(--canvas); }
 
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; width: 242px; flex-direction: column; background: var(--sidebar-bg); padding: 25px 15px 18px; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 23px; font-family: var(--font-display), sans-serif; font-size: 21px; font-weight: 800; letter-spacing: -.6px; color: var(--sidebar-ink); }
-.brand-mark { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 8px; background: var(--gold); color: var(--sidebar-bg); overflow: hidden; }
-.brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+.brand { display: flex; align-items: center; min-height: 42px; padding: 0 8px 23px; }
+.brand-logo { display: block; width: auto; height: auto; object-fit: contain; }
+.brand-logo-sidebar { width: 190px; max-width: 100%; }
 .location-picker { position: relative; }
 .location-trigger { display: flex; width: 100%; align-items: center; gap: 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.06); padding: 10px; text-align: left; cursor: pointer; }
 .location-trigger > svg { flex: 0 0 auto; color: var(--sidebar-muted); transition: transform .2s ease; }
@@ -830,7 +830,7 @@ button { color: inherit; font: inherit; }
 
 .auth-shell { display: grid; min-height: 100vh; place-items: center; background: var(--canvas); padding: 20px; }
 .auth-card { width: 100%; max-width: 380px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 30px 26px; box-shadow: 0 16px 40px rgba(20, 24, 26, .08); }
-.auth-brand { display: flex; align-items: center; gap: 8px; color: var(--accent); font-family: var(--font-display), sans-serif; font-weight: 800; font-size: 17px; }
+.brand-logo-auth { width: 178px; max-width: calc(100% - 86px); }
 .auth-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .lang-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; gap: 2px; background: var(--surface); }
 .lang-switch button { border: 0; background: transparent; padding: 5px 10px; border-radius: 999px; font-size: 14.5px; font-weight: 800; letter-spacing: .02em; color: var(--muted); cursor: pointer; }

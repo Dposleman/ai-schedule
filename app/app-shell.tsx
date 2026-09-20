@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { BrandLogo } from "@/app/brand-logo";
 import {
   AlertTriangle, ArrowLeftRight, ArrowUpRight, Bell, Banknote, Building2, CalendarDays,
   Check, ChevronDown, Clock3, ClipboardCheck, Fingerprint, History,
@@ -254,10 +255,7 @@ export default function AppShell({
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">{organization?.logoUrl ? <img src={organization.logoUrl} alt="" /> : <Sparkles size={18} fill="currentColor" />}</div>
-          <span>{t("app.name")}</span>
-        </div>
+        <div className="brand"><BrandLogo variant="sidebar" /></div>
 
         <div className="location-picker">
           <button className="location-trigger" onClick={() => setLocationOpen((v) => !v)} aria-expanded={locationOpen} aria-label={t("shell.changeLocation")}>

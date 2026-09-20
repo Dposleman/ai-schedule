@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
+import { BrandLogo } from "@/app/brand-logo";
 import { useLanguage } from "@/app/language-context";
 import { LanguageSwitcher } from "@/app/language-switcher";
 
@@ -34,7 +35,7 @@ export default function LoginPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <div className="auth-top"><div className="auth-brand"><Sparkles size={20} /> {t("app.name")}</div><LanguageSwitcher compact /></div>
+        <div className="auth-top"><BrandLogo variant="auth" /><LanguageSwitcher compact /></div>
         <h1>{t("login.title")}</h1>
         <p>{t("login.subtitle")}</p>
         <form onSubmit={submit} className="auth-form">
