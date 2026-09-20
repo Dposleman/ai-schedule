@@ -150,6 +150,14 @@ export const attendance = pgTable("attendance", {
   checkOutAt: text("check_out_at"),
   autoCheckout: integer("auto_checkout").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
+  // Manager timesheet review (master prompt 11.4): a record starts
+  // unapproved; a manager/owner reviews scheduled-vs-actual and either
+  // approves it as-is or corrects checkInAt/checkOutAt first (both actions
+  // go through PATCH /api/attendance/[id] and are audited). approvedBy is
+  // set to null, not left stale, if the record is corrected again later.
+  approved: integer("approved").notNull().default(0),
+  approvedBy: text("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at", { mode: "string" }),
 });
 
 // type: coverage_invite | coverage_needed | coverage_accepted | coverage_escalated | absence_requested | absence_decided

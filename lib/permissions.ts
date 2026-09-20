@@ -22,6 +22,7 @@ export type Capability =
   | "schedule.edit_published"
   | "schedule.override_ai"
   | "absences.approve"
+  | "attendance.manage"
   | "coverage.manage"
   | "tasks.manage"
   | "permissions.manage"
@@ -58,6 +59,7 @@ const MANAGER_BASE = new Set<Capability>([
   "schedule.publish",
   "coverage.manage",
   "tasks.manage",
+  "attendance.manage",
 ]);
 
 // Capabilities a manager only has when the org's owner has enabled the

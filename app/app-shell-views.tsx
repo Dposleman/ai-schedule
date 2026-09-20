@@ -10,12 +10,12 @@ import {
   Image as ImageIcon, Mail, MapPin, Phone, ReceiptText, Search, Send, ShieldCheck, Sparkles, Store,
   Trash2, Umbrella, UserPlus, UserCheck, UsersRound, WandSparkles, X,
 } from "lucide-react";
-import { weekDays, formatWeekRange, todayISO } from "@/lib/dates";
+import { weekDays, formatWeekRange, todayISO, startOfWeek, addDays, toISODate } from "@/lib/dates";
 import { useLanguage } from "@/app/language-context";
 import { LANGUAGES } from "@/lib/i18n";
 import type {
   CurrentUser, LocationT, OrgT, EmployeeT, ShiftT, AbsenceT, TransferT, TaskT,
-  CoverageRequestT, PermissionsT, OpenAttendanceT, TodayAttendanceT, AuditEventT, BillingT,
+  CoverageRequestT, PermissionsT, OpenAttendanceT, TodayAttendanceT, AuditEventT, BillingT, TimesheetRowT,
 } from "@/lib/view-types";
 
 // Resizes/re-encodes an uploaded image client-side before it goes anywhere
@@ -56,6 +56,19 @@ function hoursBetween(start: string, end: string) {
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
   return (eh * 60 + em - (sh * 60 + sm)) / 60;
+}
+// ISO timestamp -> the local "YYYY-MM-DDTHH:mm" a <input type="datetime-local">
+// needs, and back. Going through the Date object (not string-slicing the ISO
+// value) is what makes this reflect the browser's local timezone instead of
+// UTC — a manager correcting a 9am clock-in wants to type "09:00" and have
+// it mean 9am where they are, not 9am UTC.
+function toLocalInputValue(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromLocalInputValue(local: string) {
+  return new Date(local).toISOString();
 }
 function absenceLabel(t: (key: string) => string, type: string) {
   return type === "vacation" ? t("absence.vacation") : type === "sick" ? t("absence.sick") : t("absence.unavailable");
@@ -456,8 +469,8 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
 }
 
 /* ---------------- Time tracking ---------------- */
-export function TimeTrackingView({ location, currentUser, shift, onError }: {
-  location: LocationT | null; currentUser: CurrentUser; shift: ShiftT | undefined; onError: (error: unknown) => void;
+export function TimeTrackingView({ location, locations, employees, currentUser, shift, onError }: {
+  location: LocationT | null; locations: LocationT[]; employees: EmployeeT[]; currentUser: CurrentUser; shift: ShiftT | undefined; onError: (error: unknown) => void;
 }) {
   const { t } = useLanguage();
   const [distance, setDistance] = useState<number | null>(null);
@@ -511,37 +524,149 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: {
     } catch (e) { onError(e); }
   };
 
-  if (!location) return <div className="view-stack"><div className="empty-state">{t("time.createLocationFirst")}</div></div>;
+  const isManager = currentUser.role !== "employee";
+  if (!location && !isManager) return <div className="view-stack"><div className="empty-state">{t("time.createLocationFirst")}</div></div>;
 
   return (
     <div className="view-stack">
-      <div className="view-heading"><div><span className="view-kicker">{t("time.kicker")}</span><h2>{t("time.title", { radius: location.radiusMeters })}</h2><p>{t("time.subtitle")}</p></div><span className={`geo-status ${inside ? "inside" : "outside"}`}><MapPin size={15} /> {distance === null ? t("time.pending") : inside ? t("time.inside") : t("time.outside")}</span></div>
-      {!location.verified && (
-        <div className="geofence-monitor warning">
-          <AlertTriangle size={18} />
-          <div><strong>{t("time.unverifiedTitle")}</strong><span>{t("time.unverifiedBody")}</span></div>
+      {location && (
+        <>
+          <div className="view-heading"><div><span className="view-kicker">{t("time.kicker")}</span><h2>{t("time.title", { radius: location.radiusMeters })}</h2><p>{t("time.subtitle")}</p></div><span className={`geo-status ${inside ? "inside" : "outside"}`}><MapPin size={15} /> {distance === null ? t("time.pending") : inside ? t("time.inside") : t("time.outside")}</span></div>
+          {!location.verified && (
+            <div className="geofence-monitor warning">
+              <AlertTriangle size={18} />
+              <div><strong>{t("time.unverifiedTitle")}</strong><span>{t("time.unverifiedBody")}</span></div>
+            </div>
+          )}
+          <section className="geo-card">
+            <div className="geo-radar"><span className={inside ? "device-dot inside" : "device-dot"} /><i /><b>{location.radiusMeters} m</b></div>
+            <div className="geo-copy">
+              <span className="view-kicker">{location.name}</span>
+              <h3>{distance === null ? t("time.checkLocation") : t("time.metersFromSite", { meters: Math.round(distance) })}</h3>
+              <p>{t("time.accuracy", { accuracy: accuracy === null ? "—" : `±${Math.round(accuracy)} m` })}</p>
+              {error && <em className="geo-error"><AlertTriangle size={14} /> {error}</em>}
+              <div className="geo-actions"><button className="secondary-button" onClick={locate} disabled={locating}><MapPin size={15} /> {locating ? t("time.locating") : t("time.updateLocation")}</button></div>
+            </div>
+            <div className="clock-panel">
+              <small>{shift ? t("time.todayShift") : t("time.noShiftToday")}</small>
+              <strong>{shift ? `${shift.startTime}–${shift.endTime}` : "—"}</strong>
+              {!loaded ? null : !open ? (
+                <button className="primary-button" disabled={!inside || !location.verified} onClick={checkIn}><Fingerprint size={17} /> {location.verified ? t("time.checkIn") : t("time.checkInBlocked")}</button>
+              ) : (
+                <><span className="clocked"><i /> {t("time.checkedInAt", { time: new Date(open.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</span><button className="primary-button" onClick={checkOut}>{t("time.checkOut")}</button></>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+      {isManager && <TimesheetReviewSection employees={employees} locations={locations} />}
+    </div>
+  );
+}
+
+/* ---------------- Manager timesheet review ---------------- */
+function TimesheetReviewSection({ employees, locations }: { employees: EmployeeT[]; locations: LocationT[] }) {
+  const { t, lang } = useLanguage();
+  const [weekStart, setWeekStart] = useState(() => toISODate(startOfWeek()));
+  const weekEnd = toISODate(addDays(new Date(`${weekStart}T00:00:00`), 6));
+  const [records, setRecords] = useState<TimesheetRowT[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [correcting, setCorrecting] = useState<TimesheetRowT | null>(null);
+  const [checkInDraft, setCheckInDraft] = useState("");
+  const [checkOutDraft, setCheckOutDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    apiFetch(`/api/attendance/timesheet?weekStart=${weekStart}&weekEnd=${weekEnd}`)
+      .then((r) => r.json()).then((data) => setRecords(data.records ?? [])).finally(() => setLoading(false));
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on week change only; `load` itself is stable per render and re-including it would refetch on every render.
+  useEffect(() => { load(); }, [weekStart]);
+
+  const employeeName = (id: string, fallback: string) => employees.find((e) => e.id === id)?.name ?? fallback;
+  const locationName = (id: string | null) => (id && locations.find((l) => l.id === id)?.name) || "—";
+
+  const approve = async (row: TimesheetRowT) => {
+    await apiFetch(`/api/attendance/${row.id}`, { method: "PATCH", body: JSON.stringify({ approved: true }) });
+    load();
+  };
+  const startCorrect = (row: TimesheetRowT) => {
+    setCorrecting(row);
+    setCheckInDraft(row.checkInAt ? toLocalInputValue(row.checkInAt) : "");
+    setCheckOutDraft(row.checkOutAt ? toLocalInputValue(row.checkOutAt) : "");
+  };
+  const saveCorrection = async () => {
+    if (!correcting || !checkInDraft) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/api/attendance/${correcting.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ checkInAt: fromLocalInputValue(checkInDraft), checkOutAt: checkOutDraft ? fromLocalInputValue(checkOutDraft) : null }),
+      });
+      setCorrecting(null);
+      load();
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <article className="data-card timesheet-card">
+      <div className="section-heading">
+        <div><h3>{t("time.timesheetTitle")}</h3><p>{formatWeekRange(weekStart, lang)}</p></div>
+        <div className="section-actions">
+          <button className="secondary-button" onClick={() => setWeekStart(toISODate(startOfWeek()))}>{t("planner.today")}</button>
+          <button className="circle-button" onClick={() => setWeekStart(toISODate(addDays(new Date(`${weekStart}T00:00:00`), -7)))} aria-label={t("planner.prevWeek")}>‹</button>
+          <button className="circle-button" onClick={() => setWeekStart(toISODate(addDays(new Date(`${weekStart}T00:00:00`), 7)))} aria-label={t("planner.nextWeek")}>›</button>
+        </div>
+      </div>
+      {loading ? <div className="empty-state">{t("shell.loading")}</div> : records.length === 0 ? (
+        <div className="empty-state">{t("time.timesheetEmpty")}</div>
+      ) : (
+        <div className="timesheet-table">
+          <div className="timesheet-row timesheet-head">
+            <span>{t("team.colEmployee")}</span><span>{t("time.scheduledCol")}</span><span>{t("time.actualCol")}</span><span>{t("time.varianceCol")}</span><span>{t("team.colStatus")}</span><span />
+          </div>
+          {records.map((row) => {
+            const scheduledMin = row.shiftStart && row.shiftEnd ? hoursBetween(row.shiftStart, row.shiftEnd) * 60 : null;
+            const actualMin = row.checkInAt && row.checkOutAt ? (new Date(row.checkOutAt).getTime() - new Date(row.checkInAt).getTime()) / 60000 : null;
+            const variance = scheduledMin !== null && actualMin !== null ? Math.round(actualMin - scheduledMin) : null;
+            return (
+              <div className="timesheet-row" key={row.id}>
+                <span className="person-summary"><span className={`avatar ${employees.find((e) => e.id === row.userId)?.color ?? "blue"}`}>{initials(employeeName(row.userId, row.userName))}</span><span><strong>{employeeName(row.userId, row.userName)}</strong><small>{locationName(row.shiftLocationId)}</small></span></span>
+                <span>{row.shiftStart && row.shiftEnd ? `${row.shiftDate} · ${row.shiftStart}–${row.shiftEnd}` : t("time.noSchedule")}</span>
+                <span>{row.checkInAt ? new Date(row.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}–{row.checkOutAt ? new Date(row.checkOutAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : t("time.stillOpen")}{row.autoCheckout === 1 && <em className="conflict-note">{t("time.autoCheckoutTag")}</em>}</span>
+                <span className={variance === null ? "" : Math.abs(variance) < 10 ? "variance-ok" : "variance-warn"}>{variance === null ? "—" : `${variance > 0 ? "+" : ""}${variance} min`}</span>
+                <span><em className={`status-pill ${row.approved ? "available" : "away"}`}>{row.approved ? t("time.approved") : t("time.pendingReview")}</em></span>
+                <span className="timesheet-actions">
+                  <button className="row-action" onClick={() => startCorrect(row)}>{t("time.correct")}</button>
+                  {!row.approved && <button className="row-action" onClick={() => approve(row)}>{t("time.approve")}</button>}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
-      <section className="geo-card">
-        <div className="geo-radar"><span className={inside ? "device-dot inside" : "device-dot"} /><i /><b>{location.radiusMeters} m</b></div>
-        <div className="geo-copy">
-          <span className="view-kicker">{location.name}</span>
-          <h3>{distance === null ? t("time.checkLocation") : t("time.metersFromSite", { meters: Math.round(distance) })}</h3>
-          <p>{t("time.accuracy", { accuracy: accuracy === null ? "—" : `±${Math.round(accuracy)} m` })}</p>
-          {error && <em className="geo-error"><AlertTriangle size={14} /> {error}</em>}
-          <div className="geo-actions"><button className="secondary-button" onClick={locate} disabled={locating}><MapPin size={15} /> {locating ? t("time.locating") : t("time.updateLocation")}</button></div>
+
+      {correcting && (
+        <div className="modal-backdrop" onMouseDown={() => setCorrecting(null)}>
+          <section className="ai-modal account-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setCorrecting(null)} aria-label={t("common.close")}><X size={18} /></button>
+            <div className="modal-orb"><Clock3 size={22} /></div>
+            <span className="modal-kicker">{t("time.correctKicker")}</span>
+            <h2>{employeeName(correcting.userId, correcting.userName)}</h2>
+            <div className="transfer-form">
+              <label><span>{t("time.checkInLabel")}</span><input type="datetime-local" value={checkInDraft} onChange={(e) => setCheckInDraft(e.target.value)} /></label>
+              <label><span>{t("time.checkOutLabel")}</span><input type="datetime-local" value={checkOutDraft} onChange={(e) => setCheckOutDraft(e.target.value)} /></label>
+            </div>
+            <p className="preview-note">{t("time.correctNote")}</p>
+            <div className="modal-account-actions">
+              <button className="secondary-button" onClick={() => setCorrecting(null)}>{t("common.close")}</button>
+              <button className="primary-button modal-action" disabled={saving || !checkInDraft} onClick={saveCorrection}>{saving ? t("team.saving") : t("time.saveCorrection")}</button>
+            </div>
+          </section>
         </div>
-        <div className="clock-panel">
-          <small>{shift ? t("time.todayShift") : t("time.noShiftToday")}</small>
-          <strong>{shift ? `${shift.startTime}–${shift.endTime}` : "—"}</strong>
-          {!loaded ? null : !open ? (
-            <button className="primary-button" disabled={!inside || !location.verified} onClick={checkIn}><Fingerprint size={17} /> {location.verified ? t("time.checkIn") : t("time.checkInBlocked")}</button>
-          ) : (
-            <><span className="clocked"><i /> {t("time.checkedInAt", { time: new Date(open.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</span><button className="primary-button" onClick={checkOut}>{t("time.checkOut")}</button></>
-          )}
-        </div>
-      </section>
-    </div>
+      )}
+    </article>
   );
 }
 

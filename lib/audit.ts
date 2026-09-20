@@ -23,7 +23,9 @@ export type AuditAction =
   | "shift.publish"
   | "schedule.generate"
   | "coverage.accept"
-  | "billing.trial_expire";
+  | "billing.trial_expire"
+  | "attendance.correct"
+  | "attendance.approve";
 
 // id is null for a system-triggered event (a cron job, not a logged-in
 // user) — actorUserId is a nullable FK, so this avoids inserting a fake

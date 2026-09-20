@@ -338,6 +338,14 @@ button { color: inherit; font: inherit; }
 .hours-cell i b { display: block; height: 100%; border-radius: inherit; background: var(--info); }
 .status-pill { display: inline-flex; align-items: center; border-radius: 6px; padding: 5px 7px; font-size: 11px; font-style: normal; font-weight: 800; white-space: nowrap; }
 .status-pill.available { background: var(--success-soft); color: var(--green); }
+.timesheet-card { margin-top: 6px; }
+.timesheet-table { overflow-x: auto; }
+.timesheet-row { display: grid; grid-template-columns: 1.4fr 1.3fr 1.2fr .8fr .9fr 1fr; align-items: center; gap: 12px; min-width: 920px; padding: 12px 18px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.timesheet-row:last-child { border-bottom: 0; }
+.timesheet-head { height: 39px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--canvas); color: var(--muted-soft); font-size: 11px; font-weight: 900; letter-spacing: .09em; }
+.timesheet-actions { display: flex; gap: 6px; }
+.variance-ok { font-weight: 700; color: var(--green); }
+.variance-warn { font-weight: 700; color: var(--warning); }
 .status-pill.transfer { background: var(--info-soft); color: var(--info); }
 .status-pill.away { background: var(--warning-soft); color: var(--warning); }
 .row-action { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 8px; background: white; padding: 7px 8px; color: var(--muted); font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }

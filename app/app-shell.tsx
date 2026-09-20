@@ -374,7 +374,7 @@ export default function AppShell({
                   onRequestCoverage={async (shiftId: string) => { try { await api("/api/coverage", { method: "POST", body: JSON.stringify({ shiftId }) }); await loadAll(); } catch (e) { fail(e); } }}
                 />
               )}
-              {activeNav === "timetracking" && <TimeTrackingView location={selectedLocation ?? locations[0] ?? null} currentUser={currentUser} shift={currentUserToday} onError={fail} />}
+              {activeNav === "timetracking" && <TimeTrackingView location={selectedLocation ?? locations[0] ?? null} locations={locations} employees={employees} currentUser={currentUser} shift={currentUserToday} onError={fail} />}
               {activeNav === "dailyops" && (
                 <DailyOperationsView
                   tasks={tasks} locations={locations} employees={employees}

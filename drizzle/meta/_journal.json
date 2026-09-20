@@ -43,6 +43,13 @@
       "when": 1789853203825,
       "tag": "0005_billing_entitlements",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789894623232,
+      "tag": "0006_attendance_review",
+      "breakpoints": true
     }
   ]
 }

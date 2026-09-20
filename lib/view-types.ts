@@ -60,6 +60,17 @@ export type OpenAttendanceT = { id: string; checkInAt: string; checkOutAt: strin
 // shift (see app/api/attendance/route.ts).
 export type TodayAttendanceT = { id: string; userId: string; shiftId: string | null; checkInAt: string | null; checkOutAt: string | null };
 
+// GET /api/attendance/timesheet — manager/owner only (capability
+// attendance.manage). One row per attendance record in the requested week,
+// with the matching shift's scheduled date/time when the check-in was tied
+// to one (see app/api/attendance/timesheet/route.ts).
+export type TimesheetRowT = {
+  id: string; userId: string; userName: string;
+  shiftId: string | null; shiftDate: string | null; shiftStart: string | null; shiftEnd: string | null; shiftLocationId: string | null;
+  checkInAt: string | null; checkOutAt: string | null; autoCheckout: number;
+  approved: number; approvedBy: string | null; approvedAt: string | null;
+};
+
 // GET /api/audit — owner-only (see lib/audit.ts for the AuditAction union).
 // actorUserId is null for a system-triggered event (a cron job).
 export type AuditEventT = {
