@@ -326,6 +326,7 @@ export default function AppShell({
           <div><p>{new Date().toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}</p><h1>{activeNav === "resumen" ? t("shell.hello", { name: currentUser.name.split(" ")[0] }) : t(availableNav.find((n) => n.key === activeNav)?.labelKey ?? (activeNav === "settings" ? "nav.settings" : activeNav === "billing" ? "nav.billing" : activeNav === "auditlog" ? "nav.auditlog" : "nav.resumen"))}</h1></div>
           <div className="topbar-actions">
             <button className="icon-button" onClick={toggleTheme} aria-label={theme === "light" ? t("shell.darkTheme") : t("shell.lightTheme")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
+            <button className="icon-button mobile-logout" onClick={logout} aria-label={t("shell.logout")} title={t("shell.logout")}><LogOut size={18} /></button>
             <div className="notif-wrap">
               <button className="icon-button" aria-label={t("shell.notifications")} aria-expanded={notifOpen} onClick={toggleNotifications}>
                 <Bell size={19} />{notifUnread > 0 && <span className="notification-dot" />}

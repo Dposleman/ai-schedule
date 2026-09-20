@@ -167,6 +167,7 @@ button { color: inherit; font: inherit; }
 .profile-card span { margin-top: 2px; color: var(--sidebar-muted); font-size: 12.5px; }
 .sidebar-logout { display: flex; width: 100%; align-items: center; justify-content: center; gap: 7px; margin: 12px 0; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; background: rgba(255,255,255,.06); padding: 9px 11px; color: var(--sidebar-ink); font-size: 13px; font-weight: 750; cursor: pointer; }
 .sidebar-logout:hover { background: rgba(255,255,255,.12); }
+.mobile-logout { display: none; }
 .avatar { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--tone-teal-soft); color: var(--tone-teal); font-size: 13.5px; font-weight: 800; }
 .avatar-photo { background: #a98668; color: white; }
 .avatar.blue { background: var(--tone-blue-soft); color: var(--tone-blue); }
@@ -788,6 +789,7 @@ button { color: inherit; font: inherit; }
   .topbar h1 { font-size: 19px; }
   .topbar-actions { width: 100%; justify-content: space-between; gap: 7px; }
   .topbar-actions .icon-button { flex: 0 0 40px; width: 40px; height: 40px; }
+  .topbar-actions .mobile-logout { display: grid; }
   .role-switcher, .preference-select { min-height: 40px; }
   .topbar .primary-button { display: none; }
   .preference-select { padding-inline: 8px; }
