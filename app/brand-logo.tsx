@@ -9,7 +9,7 @@ export function BrandLogo({ variant }: BrandLogoProps) {
   return (
     <Image
       className={`brand-logo brand-logo-${variant}`}
-      src="/brand/understack-shift-logo-v1.png"
+      src={variant === "sidebar" ? "/brand/understack-shift-logo-sidebar.png" : "/brand/understack-shift-logo-v1.png"}
       alt="UnderStack Shift"
       width={1086}
       height={362}

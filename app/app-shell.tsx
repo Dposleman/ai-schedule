@@ -278,43 +278,46 @@ export default function AppShell({
           )}
         </div>
 
-        <nav className="main-nav" aria-label={t("shell.mainNav")}>
-          <p className="nav-label">{t("nav.section.operations")}</p>
-          {availableNav.map(({ key, labelKey, icon: Icon }) => {
-            const badge = key === "absences" ? absences.filter((a) => a.status === "pending").length
-              : key === "chat" ? coverage.filter((c) => c.status === "open").length
-              : key === "planner" ? shifts.filter((s) => s.status === "open").length : 0;
-            return (
-              <button className={activeNav === key ? "active" : ""} key={key} onClick={() => setActiveNav(key)}>
-                <Icon size={18} strokeWidth={1.9} /><span>{t(labelKey)}</span>{badge > 0 && <em>{badge}</em>}
-              </button>
-            );
-          })}
-          {currentUser.role !== "employee" && (
-            <>
-              <p className="nav-label nav-label-second">{t("nav.section.system")}</p>
-              <button className={activeNav === "settings" ? "active" : ""} onClick={() => setActiveNav("settings")}><Settings2 size={18} /><span>{t("nav.settings")}</span></button>
-              {currentUser.role === "owner" && (
-                <>
-                  <button className={activeNav === "billing" ? "active" : ""} onClick={() => setActiveNav("billing")}><Banknote size={18} /><span>{t("nav.billing")}</span></button>
-                  <button className={activeNav === "auditlog" ? "active" : ""} onClick={() => setActiveNav("auditlog")}><History size={18} /><span>{t("nav.auditlog")}</span></button>
-                </>
-              )}
-            </>
-          )}
-        </nav>
-
-        <div className="ai-status-card">
-          <div className="ai-orbit"><Sparkles size={16} /></div>
-          <div><strong>{t("shell.engineActive")}</strong><span><i /> {t("shell.liveData")}</span></div>
+        <div className="sidebar-scroll">
+          <nav className="main-nav" aria-label={t("shell.mainNav")}>
+            <p className="nav-label">{t("nav.section.operations")}</p>
+            {availableNav.map(({ key, labelKey, icon: Icon }) => {
+              const badge = key === "absences" ? absences.filter((a) => a.status === "pending").length
+                : key === "chat" ? coverage.filter((c) => c.status === "open").length
+                : key === "planner" ? shifts.filter((s) => s.status === "open").length : 0;
+              return (
+                <button className={activeNav === key ? "active" : ""} key={key} onClick={() => setActiveNav(key)}>
+                  <Icon size={18} strokeWidth={1.9} /><span>{t(labelKey)}</span>{badge > 0 && <em>{badge}</em>}
+                </button>
+              );
+            })}
+            {currentUser.role !== "employee" && (
+              <>
+                <p className="nav-label nav-label-second">{t("nav.section.system")}</p>
+                <button className={activeNav === "settings" ? "active" : ""} onClick={() => setActiveNav("settings")}><Settings2 size={18} /><span>{t("nav.settings")}</span></button>
+                {currentUser.role === "owner" && (
+                  <>
+                    <button className={activeNav === "billing" ? "active" : ""} onClick={() => setActiveNav("billing")}><Banknote size={18} /><span>{t("nav.billing")}</span></button>
+                    <button className={activeNav === "auditlog" ? "active" : ""} onClick={() => setActiveNav("auditlog")}><History size={18} /><span>{t("nav.auditlog")}</span></button>
+                  </>
+                )}
+              </>
+            )}
+          </nav>
         </div>
 
-        <div className="profile-card">
-          <div className={`avatar ${currentUser.color}`}>{initials(currentUser.name)}</div>
-          <div><strong>{currentUser.name}</strong><span>{t(`role.${currentUser.role}`)}</span></div>
-          <button aria-label={t("shell.logout")} onClick={logout}><LogOut size={15} /></button>
+        <div className="sidebar-footer">
+          <div className="ai-status-card">
+            <div className="ai-orbit"><Sparkles size={16} /></div>
+            <div><strong>{t("shell.engineActive")}</strong><span><i /> {t("shell.liveData")}</span></div>
+          </div>
+          <div className="profile-card">
+            <div className={`avatar ${currentUser.color}`}>{initials(currentUser.name)}</div>
+            <div><strong>{currentUser.name}</strong><span>{t(`role.${currentUser.role}`)}</span></div>
+          </div>
+          <button className="sidebar-logout" onClick={logout}><LogOut size={16} /> {t("shell.logout")}</button>
+          <LanguageSwitcher />
         </div>
-        <LanguageSwitcher />
       </aside>
 
       <section className="workspace">

@@ -124,6 +124,9 @@ button { color: inherit; font: inherit; }
 .brand { display: flex; align-items: center; min-height: 42px; padding: 0 8px 23px; }
 .brand-logo { display: block; width: auto; height: auto; object-fit: contain; }
 .brand-logo-sidebar { width: 190px; max-width: 100%; }
+.sidebar-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.26) transparent; }
+.sidebar-scroll::-webkit-scrollbar { width: 7px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.26); }
 .location-picker { position: relative; }
 .location-trigger { display: flex; width: 100%; align-items: center; gap: 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.06); padding: 10px; text-align: left; cursor: pointer; }
 .location-trigger > svg { flex: 0 0 auto; color: var(--sidebar-muted); transition: transform .2s ease; }
@@ -150,7 +153,8 @@ button { color: inherit; font: inherit; }
 .main-nav button.active::before { position: absolute; left: -15px; width: 3px; height: 21px; border-radius: 0 4px 4px 0; background: var(--gold); content: ""; }
 .main-nav button em { display: grid; width: 18px; height: 18px; margin-left: auto; place-items: center; border-radius: 6px; background: rgba(255,255,255,.1); color: var(--sidebar-muted); font-size: 13.5px; font-style: normal; }
 .main-nav button.active em { background: rgba(255,255,255,.16); color: var(--sidebar-ink); }
-.ai-status-card { display: flex; align-items: center; gap: 10px; margin-top: auto; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.06); padding: 11px; }
+.sidebar-footer { flex: 0 0 auto; }
+.ai-status-card { display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.06); padding: 11px; }
 .ai-orbit { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.08); color: var(--gold); }
 .ai-status-card strong, .ai-status-card span { display: block; color: var(--sidebar-ink); }
 .ai-status-card strong { font-size: 14px; }
@@ -161,7 +165,8 @@ button { color: inherit; font: inherit; }
 .profile-card strong, .profile-card span { display: block; }
 .profile-card strong { font-size: 14px; color: var(--sidebar-ink); }
 .profile-card span { margin-top: 2px; color: var(--sidebar-muted); font-size: 12.5px; }
-.profile-card button { display: grid; border: 0; background: transparent; color: var(--sidebar-muted); cursor: pointer; }
+.sidebar-logout { display: flex; width: 100%; align-items: center; justify-content: center; gap: 7px; margin: 12px 0; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; background: rgba(255,255,255,.06); padding: 9px 11px; color: var(--sidebar-ink); font-size: 13px; font-weight: 750; cursor: pointer; }
+.sidebar-logout:hover { background: rgba(255,255,255,.12); }
 .avatar { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--tone-teal-soft); color: var(--tone-teal); font-size: 13.5px; font-weight: 800; }
 .avatar-photo { background: #a98668; color: white; }
 .avatar.blue { background: var(--tone-blue-soft); color: var(--tone-blue); }
@@ -746,7 +751,7 @@ button { color: inherit; font: inherit; }
 @media (max-width: 780px) {
   .sidebar { width: 70px; padding: 22px 10px; }
   .brand { justify-content: center; padding-inline: 0; }
-  .brand > span, .location-copy, .location-trigger > svg, .nav-label, .main-nav button span, .main-nav button em, .ai-status-card div:last-child, .profile-card > div:nth-child(2), .profile-card button { display: none; }
+  .brand-logo-sidebar, .location-copy, .location-trigger > svg, .nav-label, .main-nav button span, .main-nav button em, .ai-status-card div:last-child, .profile-card > div:nth-child(2), .sidebar-logout { display: none; }
   .location-trigger { justify-content: center; padding: 8px; }
   .main-nav button { justify-content: center; padding: 10px; }
   .main-nav button.active::before { left: -10px; }
