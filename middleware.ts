@@ -64,8 +64,12 @@ function corsHeaders(request: NextRequest) {
 // instance) that have no reason to ever send one, and forging a
 // same-origin-looking request without the browser's cooperation isn't the
 // attack this defends against.
-function isTrustedOrigin(origin: string, appUrl: string) {
+function isTrustedOrigin(origin: string, appUrl: string, requestOrigin: string) {
   if (isTrustedMobileOrigin(origin)) return true;
+  // A project can be reached through its custom domain and its Vercel
+  // production alias. Whichever host received this request is same-origin
+  // by definition, even if NEXT_PUBLIC_APP_URL points to the other alias.
+  if (origin === requestOrigin) return true;
   if (!appUrl) return false;
   try {
     return new URL(origin).origin === new URL(appUrl).origin;
@@ -79,7 +83,7 @@ function checkCsrf(request: NextRequest): NextResponse | null {
   const origin = request.headers.get("origin") || tryOriginFromReferer(request.headers.get("referer"));
   if (!origin) return null;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-  if (!isTrustedOrigin(origin, appUrl)) {
+  if (!isTrustedOrigin(origin, appUrl, request.nextUrl.origin)) {
     return NextResponse.json({ error: "Cross-origin request blocked." }, { status: 403 });
   }
   return null;
