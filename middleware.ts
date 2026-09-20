@@ -26,10 +26,24 @@ const EXTRA_MOBILE_ORIGINS = (process.env.ALLOWED_MOBILE_ORIGINS ?? "")
   .filter(Boolean);
 const ALLOWED_MOBILE_ORIGINS = new Set([...DEFAULT_MOBILE_ORIGINS, ...EXTRA_MOBILE_ORIGINS]);
 
+function isTrustedMobileOrigin(origin: string) {
+  if (ALLOWED_MOBILE_ORIGINS.has(origin)) return true;
+  // Live-reload and some Android WebView versions include a port in their
+  // local origin (for example http://localhost:8100). It is still a local
+  // Capacitor surface, not an arbitrary web origin, so permit only the two
+  // native localhost hostnames across their http/https variants.
+  try {
+    const url = new URL(origin);
+    return (url.protocol === "http:" || url.protocol === "https:") && (url.hostname === "localhost" || url.hostname === "capacitor.localhost");
+  } catch {
+    return false;
+  }
+}
+
 function corsHeaders(request: NextRequest) {
   const origin = request.headers.get("origin");
   const headers = new Headers();
-  if (origin && ALLOWED_MOBILE_ORIGINS.has(origin)) {
+  if (origin && isTrustedMobileOrigin(origin)) {
     headers.set("Access-Control-Allow-Origin", origin);
     headers.set("Access-Control-Allow-Credentials", "true");
     headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
@@ -51,7 +65,7 @@ function corsHeaders(request: NextRequest) {
 // same-origin-looking request without the browser's cooperation isn't the
 // attack this defends against.
 function isTrustedOrigin(origin: string, appUrl: string) {
-  if (ALLOWED_MOBILE_ORIGINS.has(origin)) return true;
+  if (isTrustedMobileOrigin(origin)) return true;
   if (!appUrl) return false;
   try {
     return new URL(origin).origin === new URL(appUrl).origin;
