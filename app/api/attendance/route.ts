@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { attendance, attendanceBreaks, locations, shifts } from "@/db/schema";
+import { attendance, attendanceBreaks, attendanceIntegrityEvents, locations, shifts } from "@/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { requireUser, badRequest, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
 import { distanceInMeters, GPS_ACCURACY_SLACK_METERS } from "@/lib/geo";
+import { MAX_LOCATION_ACCURACY_METERS, verifyPresence } from "@/lib/shift-integrity";
 import { timeToMinutes } from "@/lib/time";
 import { zId } from "@/lib/validation";
 
@@ -25,11 +26,14 @@ const attendanceBodySchema = z.discriminatedUnion("action", [
     shiftId: zId.optional(),
     lat: gpsCoord,
     lng: gpsCoord,
+    accuracy: z.coerce.number().nonnegative(),
   }),
   z.object({
     action: z.literal("check-out"),
     id: zId,
-    auto: z.boolean().optional(),
+    lat: gpsCoord,
+    lng: gpsCoord,
+    accuracy: z.coerce.number().nonnegative(),
   }),
 ]);
 
@@ -115,6 +119,9 @@ export const POST = withRoute(async (request: NextRequest) => {
       .limit(1);
     if (alreadyOpen) return badRequest("You already have an open shift clocked in — clock out first.");
 
+    if (body.accuracy > MAX_LOCATION_ACCURACY_METERS) {
+      return badRequest(`Your GPS accuracy (±${Math.round(body.accuracy)}m) is too low. Move outdoors and try again.`);
+    }
     const distance = distanceInMeters(body.lat, body.lng, site.latitude, site.longitude);
     if (distance > site.radiusMeters + GPS_ACCURACY_SLACK_METERS) {
       return badRequest(`You're ${Math.round(distance)}m from ${site.name} — too far to check in (allowed radius: ${site.radiusMeters}m).`);
@@ -122,12 +129,20 @@ export const POST = withRoute(async (request: NextRequest) => {
 
     const id = newId("att");
     try {
+      const now = new Date().toISOString();
       await db.insert(attendance).values({
         id,
         orgId: user.orgId,
         shiftId: body.shiftId || null,
         userId: user.id,
-        checkInAt: new Date().toISOString(),
+        checkInAt: now,
+        lastHeartbeatAt: now,
+        lastVerifiedPresenceAt: now,
+      });
+      await db.insert(attendanceIntegrityEvents).values({
+        id: newId("aie"), orgId: user.orgId, attendanceId: id, userId: user.id,
+        type: "CLOCK_IN", status: "VERIFIED", distanceMeters: Math.round(distance), accuracyMeters: Math.round(body.accuracy),
+        metadata: JSON.stringify({ locationId, radiusMeters: site.radiusMeters, verifiedAt: now }),
       });
     } catch (err) {
       // Belt-and-suspenders: the DB's unique partial index rejects a second
@@ -141,6 +156,21 @@ export const POST = withRoute(async (request: NextRequest) => {
   }
 
   // body.action === "check-out"
+  const [active] = await db.select().from(attendance)
+    .where(and(eq(attendance.id, body.id), eq(attendance.orgId, user.orgId), eq(attendance.userId, user.id), isNull(attendance.checkOutAt))).limit(1);
+  if (!active) return badRequest("This attendance session is no longer open.");
+  const [assignedShift] = active.shiftId ? await db.select().from(shifts).where(and(eq(shifts.id, active.shiftId), eq(shifts.orgId, user.orgId))).limit(1) : [];
+  const locationId = assignedShift?.locationId ?? user.currentLocationId ?? user.homeLocationId;
+  if (!locationId) return NextResponse.json({ ok: false, code: "WORKPLACE_GEOFENCE_MISCONFIGURED", message: "No verified workplace is available for this shift." }, { status: 409 });
+  const integrity = await verifyPresence({ attendanceId: body.id, orgId: user.orgId, userId: user.id, locationId, lat: body.lat, lng: body.lng, accuracy: body.accuracy, event: "CLOCK_OUT" });
+  if (!integrity.ok) {
+    await db.insert(attendanceIntegrityEvents).values({
+      id: newId("aie"), orgId: user.orgId, attendanceId: body.id, userId: user.id, type: "REMOTE_CLOCK_OUT_ATTEMPT",
+      status: integrity.status ?? "PRESENCE_LOST", distanceMeters: integrity.distanceMeters ?? null, accuracyMeters: integrity.accuracyMeters ?? null,
+      metadata: JSON.stringify({ code: integrity.code, blockedAt: new Date().toISOString() }),
+    });
+    return NextResponse.json({ ok: false, code: "REMOTE_CLOCK_OUT_BLOCKED", message: "Clock-out must be verified from the assigned workplace. Ask a manager for a correction if this is an exception.", integrity }, { status: 409 });
+  }
   const now = new Date().toISOString();
   // Close out any break still running under this session — checking out
   // implicitly ends it rather than leaving an open-ended break row behind
@@ -151,7 +181,7 @@ export const POST = withRoute(async (request: NextRequest) => {
     .where(and(eq(attendanceBreaks.attendanceId, body.id), eq(attendanceBreaks.userId, user.id), isNull(attendanceBreaks.endAt)));
   await db
     .update(attendance)
-    .set({ checkOutAt: now, autoCheckout: body.auto ? 1 : 0 })
-    .where(and(eq(attendance.id, body.id), eq(attendance.userId, user.id)));
+    .set({ checkOutAt: now, autoCheckout: 0 })
+    .where(and(eq(attendance.id, body.id), eq(attendance.orgId, user.orgId), eq(attendance.userId, user.id), isNull(attendance.checkOutAt)));
   return NextResponse.json({ ok: true });
 });

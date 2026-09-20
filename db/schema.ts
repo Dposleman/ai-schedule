@@ -158,6 +158,21 @@ export const attendance = pgTable("attendance", {
   approved: integer("approved").notNull().default(0),
   approvedBy: text("approved_by").references(() => users.id, { onDelete: "set null" }),
   approvedAt: timestamp("approved_at", { mode: "string" }),
+  presenceStatus: text("presence_status").notNull().default("VERIFIED"),
+  consecutivePresenceFailures: integer("consecutive_presence_failures").notNull().default(0),
+  lastHeartbeatAt: timestamp("last_heartbeat_at", { mode: "string" }),
+  lastVerifiedPresenceAt: timestamp("last_verified_presence_at", { mode: "string" }),
+  firstSuspiciousAt: timestamp("first_suspicious_at", { mode: "string" }),
+  requiresReview: integer("requires_review").notNull().default(0),
+});
+
+export const attendanceIntegrityEvents = pgTable("attendance_integrity_events", {
+  id: text("id").primaryKey(), orgId: text("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  attendanceId: text("attendance_id").notNull().references(() => attendance.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), status: text("status").notNull(),
+  distanceMeters: integer("distance_meters"), accuracyMeters: integer("accuracy_meters"),
+  metadata: text("metadata").notNull().default("{}"), createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
 // One row per break within an open attendance session (master prompt 11.4

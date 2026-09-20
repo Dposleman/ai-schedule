@@ -16,6 +16,7 @@ const patchAttendanceSchema = z.object({
   checkInAt: z.string().datetime().optional(),
   checkOutAt: z.string().datetime().nullable().optional(),
   approved: z.boolean().optional(),
+  correctionReason: z.string().trim().min(5).max(1000).optional(),
 });
 
 export const PATCH = withRoute(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -38,6 +39,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   }
 
   const isCorrection = data.checkInAt !== undefined || data.checkOutAt !== undefined;
+  if (isCorrection && !data.correctionReason) return badRequest("A correction reason is required.");
   const patch: Partial<typeof attendance.$inferInsert> = {};
   if (data.checkInAt !== undefined) patch.checkInAt = data.checkInAt;
   if (data.checkOutAt !== undefined) patch.checkOutAt = data.checkOutAt;
@@ -56,6 +58,6 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   }
 
   await db.update(attendance).set(patch).where(eq(attendance.id, id));
-  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, isCorrection ? "attendance.correct" : "attendance.approve", "attendance", id, patch);
+  await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, isCorrection ? "attendance.correct" : "attendance.approve", "attendance", id, { ...patch, correctionReason: data.correctionReason });
   return NextResponse.json({ ok: true });
 });

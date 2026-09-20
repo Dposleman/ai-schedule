@@ -57,9 +57,12 @@ Push to `main` and Vercel redeploys automatically. Required environment variable
 - **Automatic coverage**: if a shift is left uncovered, a coverage request opens and
   invites compatible people (same location, available); the first to accept gets the
   shift.
-- **Time tracking (GPS clock-in)**: uses the device's location to confirm you're
-  inside the location's radius before allowing a clock-in; the record is saved to the
-  database.
+- **Shift Integrity Engine**: server-time clock-ins and clock-outs are checked against
+  the assigned, verified workplace radius and a maximum GPS accuracy. An active shift
+  sends a consented five-minute presence heartbeat; three failed readings mark it for
+  review without rewriting past events. Remote clock-outs are blocked, every integrity
+  event is kept in an append-only tenant-scoped timeline, and manager time corrections
+  require an auditable reason.
 - **Costs**: calculated for real from shift hours × each employee's hourly rate,
   compared against the budget you set per location. "Export CSV" downloads the actual
   numbers.

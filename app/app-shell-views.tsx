@@ -476,7 +476,7 @@ export function TimeTrackingView({ location, locations, employees, currentUser, 
   const { t } = useLanguage();
   const [distance, setDistance] = useState<number | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<OpenAttendanceT | null>(null);
@@ -490,8 +490,8 @@ export function TimeTrackingView({ location, locations, employees, currentUser, 
 
   const inside = location && distance !== null && distance <= location.radiusMeters && (accuracy ?? 999) <= 60;
 
-  const locate = async () => {
-    if (!location) return;
+  const locate = async (): Promise<{ lat: number; lng: number; accuracy: number } | null> => {
+    if (!location) return null;
     setLocating(true);
     try {
       const permissions = await Geolocation.requestPermissions();
@@ -499,30 +499,60 @@ export function TimeTrackingView({ location, locations, employees, currentUser, 
       const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
       setDistance(distanceInMeters(position.coords.latitude, position.coords.longitude, location.latitude, location.longitude));
       setAccuracy(position.coords.accuracy);
-      setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+      const point = { lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy };
+      setCoords(point);
       setError(null);
+      return point;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("time.locationError"));
+      return null;
     } finally { setLocating(false); }
   };
+
+  // An active shift receives fresh, consented location evidence while this
+  // screen is open. The server owns the timestamp and state transition; the
+  // browser never decides whether a person is present.
+  useEffect(() => {
+    if (!open || !location) return;
+    let cancelled = false;
+    const heartbeat = async () => {
+      try {
+        const permissions = await Geolocation.requestPermissions();
+        if (permissions.location === "denied") return;
+        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
+        const response = await apiFetch(`/api/attendance/${open.id}/heartbeat`, { method: "POST", body: JSON.stringify({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy }) });
+        const data = await response.json();
+        if (!cancelled && data.status) setOpen((current) => current ? { ...current, presenceStatus: data.status, consecutivePresenceFailures: data.status === "VERIFIED" ? 0 : current.consecutivePresenceFailures + 1 } : current);
+      } catch { /* GPS loss is represented by the next server-verified event. */ }
+    };
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 5 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [open?.id, location?.id]);
 
   const checkIn = async () => {
     if (!location) return;
     try {
+      const point = await locate();
+      if (!point) throw new Error(t("time.locationError"));
       const response = await apiFetch("/api/attendance", {
         method: "POST",
-        body: JSON.stringify({ action: "check-in", shiftId: shift?.id, locationId: location.id, lat: coords?.lat, lng: coords?.lng }),
+        body: JSON.stringify({ action: "check-in", shiftId: shift?.id, locationId: location.id, ...point }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
-      setOpen({ id: data.id, checkInAt: new Date().toISOString(), checkOutAt: null });
+      setOpen({ id: data.id, checkInAt: new Date().toISOString(), checkOutAt: null, presenceStatus: "VERIFIED", consecutivePresenceFailures: 0 });
     } catch (e) { onError(e); }
   };
 
   const checkOut = async () => {
     if (!open) return;
     try {
-      await apiFetch("/api/attendance", { method: "POST", body: JSON.stringify({ action: "check-out", id: open.id }) });
+      const point = await locate();
+      if (!point) throw new Error(t("time.locationError"));
+      const response = await apiFetch("/api/attendance", { method: "POST", body: JSON.stringify({ action: "check-out", id: open.id, ...point }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message ?? data.error ?? "Clock-out could not be verified.");
       setOpen(null);
       setOpenBreak(null);
     } catch (e) { onError(e); }
@@ -574,6 +604,7 @@ export function TimeTrackingView({ location, locations, employees, currentUser, 
               ) : (
                 <>
                   <span className="clocked"><i /> {openBreak ? t("time.onBreakSince", { time: new Date(openBreak.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : t("time.checkedInAt", { time: new Date(open.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</span>
+                  <small className={open.presenceStatus === "VERIFIED" ? "presence-verified" : "presence-warning"}>Presence: {open.presenceStatus.replace("PRESENCE_", "").toLowerCase()}</small>
                   <div className="clock-panel-actions">
                     <button className="secondary-button" onClick={toggleBreak} disabled={breakBusy}><Clock3 size={15} /> {openBreak ? t("time.endBreak") : t("time.startBreak")}</button>
                     <button className="primary-button" onClick={checkOut}>{t("time.checkOut")}</button>
@@ -599,6 +630,7 @@ function TimesheetReviewSection({ employees, locations }: { employees: EmployeeT
   const [correcting, setCorrecting] = useState<TimesheetRowT | null>(null);
   const [checkInDraft, setCheckInDraft] = useState("");
   const [checkOutDraft, setCheckOutDraft] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = () => {
@@ -625,6 +657,7 @@ function TimesheetReviewSection({ employees, locations }: { employees: EmployeeT
     setCorrecting(row);
     setCheckInDraft(row.checkInAt ? toLocalInputValue(row.checkInAt) : "");
     setCheckOutDraft(row.checkOutAt ? toLocalInputValue(row.checkOutAt) : "");
+    setCorrectionReason("");
   };
   const saveCorrection = async () => {
     if (!correcting || !checkInDraft) return;
@@ -632,7 +665,7 @@ function TimesheetReviewSection({ employees, locations }: { employees: EmployeeT
     try {
       await apiFetch(`/api/attendance/${correcting.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ checkInAt: fromLocalInputValue(checkInDraft), checkOutAt: checkOutDraft ? fromLocalInputValue(checkOutDraft) : null }),
+        body: JSON.stringify({ checkInAt: fromLocalInputValue(checkInDraft), checkOutAt: checkOutDraft ? fromLocalInputValue(checkOutDraft) : null, correctionReason }),
       });
       setCorrecting(null);
       load();
@@ -691,11 +724,12 @@ function TimesheetReviewSection({ employees, locations }: { employees: EmployeeT
             <div className="transfer-form">
               <label><span>{t("time.checkInLabel")}</span><input type="datetime-local" value={checkInDraft} onChange={(e) => setCheckInDraft(e.target.value)} /></label>
               <label><span>{t("time.checkOutLabel")}</span><input type="datetime-local" value={checkOutDraft} onChange={(e) => setCheckOutDraft(e.target.value)} /></label>
+              <label><span>Correction reason</span><textarea value={correctionReason} onChange={(e) => setCorrectionReason(e.target.value)} placeholder="Explain why this attendance record is being corrected" /></label>
             </div>
             <p className="preview-note">{t("time.correctNote")}</p>
             <div className="modal-account-actions">
               <button className="secondary-button" onClick={() => setCorrecting(null)}>{t("common.close")}</button>
-              <button className="primary-button modal-action" disabled={saving || !checkInDraft} onClick={saveCorrection}>{saving ? t("team.saving") : t("time.saveCorrection")}</button>
+              <button className="primary-button modal-action" disabled={saving || !checkInDraft || correctionReason.trim().length < 5} onClick={saveCorrection}>{saving ? t("team.saving") : t("time.saveCorrection")}</button>
             </div>
           </section>
         </div>

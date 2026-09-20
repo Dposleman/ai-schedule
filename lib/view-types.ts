@@ -53,7 +53,11 @@ export type NotificationT = { id: string; type: string; title: string; body: str
 
 // The one shape used only inside app-shell-views.tsx (TimeTrackingView's
 // open attendance record) — kept here too so it's typed instead of `any`.
-export type OpenAttendanceT = { id: string; checkInAt: string; checkOutAt: string | null };
+export type OpenAttendanceT = {
+  id: string; checkInAt: string; checkOutAt: string | null;
+  presenceStatus: "VERIFIED" | "PRESENCE_DEGRADED" | "PRESENCE_UNCERTAIN" | "PRESENCE_LOST";
+  consecutivePresenceFailures: number;
+};
 
 // GET /api/attendance's openBreak — the current user's running break under
 // their open attendance session, if any (see app/api/attendance/break/route.ts).
