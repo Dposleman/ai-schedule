@@ -375,9 +375,19 @@ export default function AppShell({
                 />
               )}
               {activeNav === "timetracking" && <TimeTrackingView location={selectedLocation ?? locations[0] ?? null} currentUser={currentUser} shift={currentUserToday} onError={fail} />}
-              {activeNav === "dailyops" && <DailyOperationsView tasks={tasks} locationId={location !== "all" ? location : locations[0]?.id} onCreate={async (name: string) => { if (!locations[0]) return; try { await api("/api/tasks", { method: "POST", body: JSON.stringify({ name, locationId: location !== "all" ? location : locations[0].id, date: todayISO() }) }); await loadAll(); } catch (e) { fail(e); } }} onToggle={async (id: string, completed: boolean) => { try { await api(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify({ completed }) }); await loadAll(); } catch (e) { fail(e); } }} />}
+              {activeNav === "dailyops" && (
+                <DailyOperationsView
+                  tasks={tasks} locations={locations} employees={employees}
+                  locationId={location !== "all" ? location : locations[0]?.id}
+                  currentUserId={currentUser.id}
+                  onCreate={async ({ name, locationId: taskLocationId, dueTime, ownerUserId }) => {
+                    try { await api("/api/tasks", { method: "POST", body: JSON.stringify({ name, locationId: taskLocationId, dueTime, ownerUserId, date: todayISO() }) }); await loadAll(); } catch (e) { fail(e); }
+                  }}
+                  onToggle={async (id: string, completed: boolean) => { try { await api(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify({ completed }) }); await loadAll(); } catch (e) { fail(e); } }}
+                />
+              )}
               {activeNav === "costs" && <CostsView locations={locations} employees={employees} shifts={shifts} />}
-              {activeNav === "team" && <TeamView employees={locationEmployees} locations={locations} onTransfer={setTransferTarget} />}
+              {activeNav === "team" && <TeamView employees={locationEmployees} locations={locations} onTransfer={setTransferTarget} onEdit={async (employeeId, patch) => { try { await api(`/api/employees/${employeeId}`, { method: "PATCH", body: JSON.stringify(patch) }); await loadAll(); } catch (e) { fail(e); } }} />}
               {activeNav === "transfers" && <TransfersView employees={employees} locations={locations} transfers={transfers} onNew={() => setTransferTarget(employees[0] ?? null)} onComplete={async (id: string) => { try { await api(`/api/transfers/${id}`, { method: "PATCH", body: JSON.stringify({ status: "completed" }) }); await loadAll(); } catch (e) { fail(e); } }} />}
               {activeNav === "absences" && currentUser.role === "employee" && (
                 <MyAbsencesView unavailableDays={unavailableDays} absences={absences.filter((a) => a.userId === currentUser.id)}

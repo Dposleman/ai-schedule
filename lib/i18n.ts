@@ -171,6 +171,12 @@ const en: Dict = {
   "planner.shiftModalBody": "Remove this person from the shift if it needs coverage, or request a replacement.",
   "planner.unassign": "Remove assignment",
   "planner.requestCoverage": "Find coverage",
+  "planner.conflictTitle": "Double-booking",
+  "planner.conflictBody": "This person has {count} other shift(s) that overlap this time — check before publishing.",
+  "planner.assignKicker": "ASSIGN SHIFT",
+  "planner.assignBody": "Pick one of today's open shifts to assign to this person.",
+  "planner.assignEmpty": "No open shifts on this date to assign.",
+  "planner.assignAction": "Assign",
 
   // Time tracking
   "time.kicker": "TIME TRACKING · GPS",
@@ -206,6 +212,11 @@ const en: Dict = {
   "ops.complete": "Completed",
   "ops.pending": "Pending",
   "ops.markComplete": "Mark complete",
+  "ops.locationLabel": "Location",
+  "ops.ownerLabel": "Owner",
+  "ops.dueTimeLabel": "Due time",
+  "ops.unassignedOwner": "Unassigned",
+  "ops.ownedBy": "Owner: {name}",
 
   // Costs
   "costs.kicker": "COSTS & PAYROLL",
@@ -244,6 +255,13 @@ const en: Dict = {
   "team.transferred": "Transferred",
   "team.transfer": "Transfer",
   "team.noResults": "No results.",
+  "team.edit": "Edit",
+  "team.editKicker": "EDIT TEAM MEMBER",
+  "team.occupationLabel": "Role / skills",
+  "team.weeklyTargetLabel": "Weekly hour target",
+  "team.rateLabel": "Hourly rate (DKK)",
+  "team.saving": "Saving…",
+  "team.save": "Save",
 
   // Transfers
   "transfers.kicker": "TRANSFERS",
@@ -659,6 +677,12 @@ const da: Dict = {
   "planner.shiftModalBody": "Fjern denne person fra vagten, hvis den skal dækkes, eller anmod om en afløser.",
   "planner.unassign": "Fjern tildeling",
   "planner.requestCoverage": "Find dækning",
+  "planner.conflictTitle": "Dobbeltbooking",
+  "planner.conflictBody": "Denne person har {count} anden/andre vagt(er), der overlapper dette tidsrum — tjek det, før du udgiver.",
+  "planner.assignKicker": "TILDEL VAGT",
+  "planner.assignBody": "Vælg en af dagens åbne vagter til denne person.",
+  "planner.assignEmpty": "Ingen åbne vagter på denne dato at tildele.",
+  "planner.assignAction": "Tildel",
 
   "time.kicker": "TIDSREGISTRERING · GPS",
   "time.title": "Stempling beskyttet af en radius på {radius} m",
@@ -692,6 +716,11 @@ const da: Dict = {
   "ops.complete": "Udført",
   "ops.pending": "Afventer",
   "ops.markComplete": "Markér som udført",
+  "ops.locationLabel": "Lokation",
+  "ops.ownerLabel": "Ansvarlig",
+  "ops.dueTimeLabel": "Frist",
+  "ops.unassignedOwner": "Ikke tildelt",
+  "ops.ownedBy": "Ansvarlig: {name}",
 
   "costs.kicker": "OMKOSTNINGER & LØN",
   "costs.title": "Beregnet ud fra faktiske vagter",
@@ -728,6 +757,13 @@ const da: Dict = {
   "team.transferred": "Overflyttet",
   "team.transfer": "Overflyt",
   "team.noResults": "Ingen resultater.",
+  "team.edit": "Rediger",
+  "team.editKicker": "REDIGER TEAMMEDLEM",
+  "team.occupationLabel": "Rolle / kompetencer",
+  "team.weeklyTargetLabel": "Ugentligt timemål",
+  "team.rateLabel": "Timeløn (DKK)",
+  "team.saving": "Gemmer…",
+  "team.save": "Gem",
 
   "transfers.kicker": "OVERFLYTNINGER",
   "transfers.title": "Mobilitet mellem lokationer",

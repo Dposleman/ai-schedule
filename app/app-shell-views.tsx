@@ -60,6 +60,19 @@ function hoursBetween(start: string, end: string) {
 function absenceLabel(t: (key: string) => string, type: string) {
   return type === "vacation" ? t("absence.vacation") : type === "sick" ? t("absence.sick") : t("absence.unavailable");
 }
+// Two same-day time ranges overlap when one starts before the other ends,
+// in both directions — used to flag double-booking (same employee assigned
+// to two shifts, at any location, whose hours collide).
+function timeRangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart < bEnd && bStart < aEnd;
+}
+// All of an employee's OTHER shifts on a given date that overlap the given
+// time range — used both to warn when opening an already-assigned shift and
+// to flag candidates in the manual-assign picker before a manager commits to
+// double-booking someone.
+function conflictingShifts(shifts: ShiftT[], employeeId: string, date: string, startTime: string, endTime: string, excludeShiftId?: string) {
+  return shifts.filter((s) => s.userId === employeeId && s.date === date && s.id !== excludeShiftId && timeRangesOverlap(startTime, endTime, s.startTime, s.endTime));
+}
 
 /* ---------------- Overview ---------------- */
 export function MetricCard({ label, value, detail, tone, icon: Icon }: { label: string; value: string; detail: string; tone: string; icon: React.ComponentType<{ size?: number }> }) {
@@ -282,6 +295,10 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
   const scoped = shifts.filter((s) => location === "all" || s.locationId === location);
   const hasDraft = scoped.some((s) => s.aiGenerated === 1 && s.published === 0);
   const [editing, setEditing] = useState<ShiftT | null>(null);
+  const [assignTarget, setAssignTarget] = useState<{ employeeId: string; date: string } | null>(null);
+  const assignCandidates = assignTarget
+    ? scoped.filter((s) => s.status === "open" && s.date === assignTarget.date)
+    : [];
 
   const exportScheduleCsv = () => {
     const rows = [[
@@ -335,9 +352,16 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
                     <div className="employee-cell"><div className={`avatar ${employee.color}`}>{initials(employee.name)}</div><div><strong>{employee.name}</strong><span>{employee.occupation}</span></div></div>
                     {days.map((d) => {
                       const shift = scoped.find((s) => s.userId === employee.id && s.date === d.date);
+                      const hasOpenCandidate = scoped.some((s) => s.status === "open" && s.date === d.date);
                       return (
                         <div className="shift-cell" key={d.date}>
-                          <button type="button" className={`shift-block ${shift ? "work" : "empty"}`} onClick={() => shift && setEditing(shift)} style={{ border: 0, cursor: shift ? "pointer" : "default", width: "100%" }}>
+                          <button
+                            type="button"
+                            className={`shift-block ${shift ? "work" : "empty"}`}
+                            onClick={() => (shift ? setEditing(shift) : hasOpenCandidate && setAssignTarget({ employeeId: employee.id, date: d.date }))}
+                            style={{ border: 0, cursor: shift || hasOpenCandidate ? "pointer" : "default", width: "100%" }}
+                            aria-label={shift ? undefined : hasOpenCandidate ? t("planner.assignAction") : undefined}
+                          >
                             {shift ? <><i /><span>{shift.startTime}–{shift.endTime}</span></> : <span>—</span>}
                           </button>
                         </div>
@@ -368,21 +392,65 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
         </aside>
       </div>
 
-      {editing && (
-        <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
-          <section className="ai-modal transfer-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setEditing(null)} aria-label={t("common.close")}><X size={18} /></button>
-            <div className="modal-orb transfer-orb"><CalendarDays size={22} /></div>
-            <span className="modal-kicker">{t("planner.shiftKicker")}</span>
-            <h2>{editing.date} · {editing.startTime}–{editing.endTime}</h2>
-            <p>{t("planner.shiftModalBody")}</p>
-            <div className="modal-account-actions">
-              <button className="secondary-button" onClick={() => { onAssign(editing.id, null); setEditing(null); }}>{t("planner.unassign")}</button>
-              <button className="primary-button modal-action" onClick={() => { onRequestCoverage(editing.id); setEditing(null); }}><Send size={15} /> {t("planner.requestCoverage")}</button>
-            </div>
-          </section>
-        </div>
-      )}
+      {editing && (() => {
+        const conflicts = editing.userId ? conflictingShifts(shifts, editing.userId, editing.date, editing.startTime, editing.endTime, editing.id) : [];
+        return (
+          <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
+            <section className="ai-modal transfer-modal" onMouseDown={(e) => e.stopPropagation()}>
+              <button className="modal-close" onClick={() => setEditing(null)} aria-label={t("common.close")}><X size={18} /></button>
+              <div className="modal-orb transfer-orb"><CalendarDays size={22} /></div>
+              <span className="modal-kicker">{t("planner.shiftKicker")}</span>
+              <h2>{editing.date} · {editing.startTime}–{editing.endTime}</h2>
+              <p>{t("planner.shiftModalBody")}</p>
+              {conflicts.length > 0 && (
+                <div className="geofence-monitor warning">
+                  <AlertTriangle size={18} />
+                  <div><strong>{t("planner.conflictTitle")}</strong><span>{t("planner.conflictBody", { count: conflicts.length })}</span></div>
+                </div>
+              )}
+              <div className="modal-account-actions">
+                <button className="secondary-button" onClick={() => { onAssign(editing.id, null); setEditing(null); }}>{t("planner.unassign")}</button>
+                <button className="primary-button modal-action" onClick={() => { onRequestCoverage(editing.id); setEditing(null); }}><Send size={15} /> {t("planner.requestCoverage")}</button>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
+
+      {assignTarget && (() => {
+        const employee = employees.find((e) => e.id === assignTarget.employeeId);
+        return (
+          <div className="modal-backdrop" onMouseDown={() => setAssignTarget(null)}>
+            <section className="ai-modal transfer-modal" onMouseDown={(e) => e.stopPropagation()}>
+              <button className="modal-close" onClick={() => setAssignTarget(null)} aria-label={t("common.close")}><X size={18} /></button>
+              <div className="modal-orb transfer-orb"><UsersRound size={22} /></div>
+              <span className="modal-kicker">{t("planner.assignKicker")}</span>
+              <h2>{employee?.name} · {assignTarget.date}</h2>
+              <p>{t("planner.assignBody")}</p>
+              {assignCandidates.length === 0 ? (
+                <div className="empty-state">{t("planner.assignEmpty")}</div>
+              ) : (
+                <div className="assign-candidate-list">
+                  {assignCandidates.map((candidate) => {
+                    const conflicts = conflictingShifts(shifts, assignTarget.employeeId, candidate.date, candidate.startTime, candidate.endTime);
+                    const locName = locations.find((l) => l.id === candidate.locationId)?.name ?? "";
+                    return (
+                      <div className="assign-candidate-row" key={candidate.id}>
+                        <div>
+                          <strong>{candidate.startTime}–{candidate.endTime}</strong>
+                          <span>{locName}</span>
+                          {conflicts.length > 0 && <em className="conflict-note"><AlertTriangle size={12} /> {t("planner.conflictBody", { count: conflicts.length })}</em>}
+                        </div>
+                        <button className="secondary-button" onClick={() => { onAssign(candidate.id, assignTarget.employeeId); setAssignTarget(null); }}>{t("planner.assignAction")}</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -478,24 +546,46 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: {
 }
 
 /* ---------------- Daily operations ---------------- */
-export function DailyOperationsView({ tasks, locationId, onCreate, onToggle }: {
-  tasks: TaskT[]; locationId: string | undefined; onCreate: (name: string) => void; onToggle: (id: string, completed: boolean) => void;
+export function DailyOperationsView({ tasks, locations, employees, locationId, currentUserId, onCreate, onToggle }: {
+  tasks: TaskT[]; locations: LocationT[]; employees: EmployeeT[]; locationId: string | undefined; currentUserId: string;
+  onCreate: (input: { name: string; locationId: string; dueTime: string; ownerUserId: string }) => void;
+  onToggle: (id: string, completed: boolean) => void;
 }) {
   const { t } = useLanguage();
   const [name, setName] = useState("");
+  const [taskLocationId, setTaskLocationId] = useState(locationId ?? "");
+  const [dueTime, setDueTime] = useState("09:00");
+  const [ownerUserId, setOwnerUserId] = useState(currentUserId);
+  const effectiveLocationId = taskLocationId || locationId || "";
+  const locationName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
+  const ownerName = (id: string | null) => employees.find((e) => e.id === id)?.name ?? t("ops.unassignedOwner");
+
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("ops.kicker")}</span><h2>{t("ops.title")}</h2><p>{t("ops.subtitle")}</p></div></div>
-      <div className="filter-row">
+      <div className="filter-row ops-new-task-row">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("ops.newTaskPlaceholder")} aria-label={t("ops.newTaskPlaceholder")} style={{ flex: 1, border: "1px solid var(--line)", borderRadius: 10, padding: "8px 11px", fontSize: 12 }} />
-        <button className="primary-button" disabled={!name.trim() || !locationId} onClick={() => { onCreate(name.trim()); setName(""); }}>{t("ops.addTask")}</button>
+        {locations.length > 1 && (
+          <select aria-label={t("ops.locationLabel")} value={effectiveLocationId} onChange={(e) => setTaskLocationId(e.target.value)}>
+            {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
+        )}
+        <select aria-label={t("ops.ownerLabel")} value={ownerUserId} onChange={(e) => setOwnerUserId(e.target.value)}>
+          {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+        <input type="time" aria-label={t("ops.dueTimeLabel")} value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+        <button className="primary-button" disabled={!name.trim() || !effectiveLocationId} onClick={() => { onCreate({ name: name.trim(), locationId: effectiveLocationId, dueTime, ownerUserId }); setName(""); }}>{t("ops.addTask")}</button>
       </div>
       {tasks.length === 0 ? <div className="empty-state">{t("ops.noTasks")}</div> : (
         <section className="task-board">
           {tasks.map((task, index) => (
             <article className={task.completed ? "task-item complete" : "task-item"} key={task.id}>
               <span className="task-check">{task.completed ? <Check size={18} /> : index + 1}</span>
-              <div><small>{task.dueTime}</small><h3>{task.name}</h3><p>{task.completed ? t("ops.complete") : t("ops.pending")}</p></div>
+              <div>
+                <small>{task.dueTime} · {locationName(task.locationId)}</small>
+                <h3>{task.name}</h3>
+                <p>{task.completed ? t("ops.complete") : t("ops.pending")} · {t("ops.ownedBy", { name: ownerName(task.ownerUserId) })}</p>
+              </div>
               {!task.completed && <button className="secondary-button" onClick={() => onToggle(task.id, true)}>{t("ops.markComplete")}</button>}
             </article>
           ))}
@@ -578,13 +668,35 @@ export function CostsView({ locations, employees, shifts }: { locations: Locatio
 }
 
 /* ---------------- Team ---------------- */
-export function TeamView({ employees, locations, onTransfer }: {
+export function TeamView({ employees, locations, onTransfer, onEdit }: {
   employees: EmployeeT[]; locations: LocationT[]; onTransfer: (employee: EmployeeT) => void;
+  onEdit: (employeeId: string, patch: { occupation: string; weeklyHourTarget: number; hourlyRate: number }) => Promise<void>;
 }) {
   const { t, locale } = useLanguage();
   const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<EmployeeT | null>(null);
+  const [occupation, setOccupation] = useState("");
+  const [weeklyHourTarget, setWeeklyHourTarget] = useState("");
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [saving, setSaving] = useState(false);
   const filtered = employees.filter((e) => `${e.name} ${e.occupation}`.toLowerCase().includes(query.toLowerCase()));
   const locationName = (id: string | null) => locations.find((l) => l.id === id)?.name ?? t("team.unassigned");
+
+  const startEdit = (person: EmployeeT) => {
+    setEditing(person);
+    setOccupation(person.occupation);
+    setWeeklyHourTarget(String(person.weeklyHourTarget ?? 0));
+    setHourlyRate(((person.hourlyRateCents ?? 0) / 100).toFixed(2));
+  };
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await onEdit(editing.id, { occupation: occupation.trim(), weeklyHourTarget: Number(weeklyHourTarget) || 0, hourlyRate: Number(hourlyRate) || 0 });
+      setEditing(null);
+    } finally { setSaving(false); }
+  };
+
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("team.kicker")}</span><h2>{t("team.peopleCount", { count: employees.length })}</h2><p>{t("team.subtitle")}</p></div><label className="directory-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("team.search")} /></label></div>
@@ -597,11 +709,36 @@ export function TeamView({ employees, locations, onTransfer }: {
             <span><Building2 size={13} /> {locationName(person.currentLocationId)}</span>
             <span className="hours-cell"><strong>{money(person.hourlyRateCents ?? 0, locale)}</strong></span>
             <span><em className={`status-pill ${person.homeLocationId === person.currentLocationId ? "available" : "transfer"}`}>{person.homeLocationId === person.currentLocationId ? t("team.atHome") : t("team.transferred")}</em></span>
-            <span><button className="row-action" onClick={() => onTransfer(person)}>{t("team.transfer")} <ArrowLeftRight size={13} /></button></span>
+            <span className="team-row-actions">
+              <button className="row-action" onClick={() => startEdit(person)}>{t("team.edit")}</button>
+              <button className="row-action" onClick={() => onTransfer(person)}>{t("team.transfer")} <ArrowLeftRight size={13} /></button>
+            </span>
           </div>
         ))}
         {filtered.length === 0 && <p className="empty-state">{t("team.noResults")}</p>}
       </article>
+
+      {editing && (
+        <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
+          <section className="ai-modal account-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setEditing(null)} aria-label={t("common.close")}><X size={18} /></button>
+            <div className="modal-orb transfer-orb"><UsersRound size={22} /></div>
+            <span className="modal-kicker">{t("team.editKicker")}</span>
+            <h2>{editing.name}</h2>
+            <div className="transfer-form">
+              <label><span>{t("team.occupationLabel")}</span><input value={occupation} onChange={(e) => setOccupation(e.target.value)} maxLength={100} /></label>
+              <div className="date-fields">
+                <label><span>{t("team.weeklyTargetLabel")}</span><input type="number" min={0} max={80} value={weeklyHourTarget} onChange={(e) => setWeeklyHourTarget(e.target.value)} /></label>
+                <label><span>{t("team.rateLabel")}</span><input type="number" min={0} step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} /></label>
+              </div>
+            </div>
+            <div className="modal-account-actions">
+              <button className="secondary-button" onClick={() => setEditing(null)}>{t("common.close")}</button>
+              <button className="primary-button modal-action" disabled={saving || !occupation.trim()} onClick={save}>{saving ? t("team.saving") : t("team.save")}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
