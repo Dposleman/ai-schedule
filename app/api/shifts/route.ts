@@ -39,6 +39,7 @@ const createShiftSchema = z.object({
   startTime: zTime,
   endTime: zTime,
   role: z.string().trim().max(100).optional().default(""),
+  published: z.boolean().optional().default(true),
 });
 
 export const POST = withRoute(async (request: NextRequest) => {
@@ -61,7 +62,7 @@ export const POST = withRoute(async (request: NextRequest) => {
     endTime: data.endTime,
     role: data.role,
     status: data.userId ? "scheduled" : "open",
-    published: 1,
+    published: data.published ? 1 : 0,
   });
   return NextResponse.json({ ok: true, id });
 });

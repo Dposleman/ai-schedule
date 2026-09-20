@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { shifts } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { requireUser, requireCapability, notFound, badRequest, withRoute } from "@/lib/api";
-import { parseBody, zId, zTime } from "@/lib/validation";
+import { parseBody, zDate, zId, zTime } from "@/lib/validation";
 import { recordAuditEvent } from "@/lib/audit";
 
 function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
@@ -17,6 +17,7 @@ const patchShiftSchema = z.object({
   userId: z.union([zId, z.null()]).optional(),
   startTime: zTime.optional(),
   endTime: zTime.optional(),
+  date: zDate.optional(),
   role: z.string().trim().max(100).optional(),
   force: z.boolean().optional(),
 });
@@ -50,6 +51,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   }
   if (body.startTime !== undefined) patch.startTime = body.startTime;
   if (body.endTime !== undefined) patch.endTime = body.endTime;
+  if (body.date !== undefined) patch.date = body.date;
   if (body.role !== undefined) patch.role = body.role;
 
   // Warn instead of silently double-booking: if this assigns (or re-times)
@@ -62,7 +64,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
     const sameDayShifts = await db
       .select()
       .from(shifts)
-      .where(and(eq(shifts.orgId, user.orgId), eq(shifts.userId, assigneeId), eq(shifts.date, existing.date), ne(shifts.id, id)));
+      .where(and(eq(shifts.orgId, user.orgId), eq(shifts.userId, assigneeId), eq(shifts.date, patch.date ?? existing.date), ne(shifts.id, id)));
     const conflict = sameDayShifts.find((s) => timesOverlap(newStart, newEnd, s.startTime, s.endTime));
     if (conflict) {
       return badRequest(

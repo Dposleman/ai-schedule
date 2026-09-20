@@ -298,17 +298,22 @@ export function MyShiftView({ shift, locations, tasks, currentUser }: {
 }
 
 /* ---------------- Planner ---------------- */
-export function PlannerView({ employees, shifts, locations, location, weekStart, weekEnd, onPrevWeek, onNextWeek, onToday, onGenerate, onPublish, onAssign, onRequestCoverage }: {
+export function PlannerView({ employees, shifts, locations, location, weekStart, weekEnd, onPrevWeek, onNextWeek, onToday, onGenerate, onPublish, onAssign, onRequestCoverage, onCreateShift, onUpdateShift, onDeleteShift }: {
   employees: EmployeeT[]; shifts: ShiftT[]; locations: LocationT[]; location: string;
   weekStart: string; weekEnd: string;
   onPrevWeek: () => void; onNextWeek: () => void; onToday: () => void; onGenerate: () => void; onPublish: () => void;
   onAssign: (shiftId: string, userId: string | null) => void; onRequestCoverage: (shiftId: string) => void;
+  onCreateShift: (input: { userId: string; date: string; startTime: string; endTime: string; locationId: string; published: boolean }) => Promise<void>;
+  onUpdateShift: (id: string, input: { userId: string | null; date: string; startTime: string; endTime: string }) => Promise<void>;
+  onDeleteShift: (id: string) => Promise<void>;
 }) {
   const { t, lang } = useLanguage();
   const days = weekDays(weekStart, lang);
   const scoped = shifts.filter((s) => location === "all" || s.locationId === location);
   const hasDraft = scoped.some((s) => s.aiGenerated === 1 && s.published === 0);
   const [editing, setEditing] = useState<ShiftT | null>(null);
+  const [newShift, setNewShift] = useState<{ userId: string; date: string; startTime: string; endTime: string; locationId: string } | null>(null);
+  const [savingShift, setSavingShift] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ employeeId: string; date: string } | null>(null);
   const assignCandidates = assignTarget
     ? scoped.filter((s) => s.status === "open" && s.date === assignTarget.date)
@@ -372,9 +377,9 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
                           <button
                             type="button"
                             className={`shift-block ${shift ? "work" : "empty"}`}
-                            onClick={() => (shift ? setEditing(shift) : hasOpenCandidate && setAssignTarget({ employeeId: employee.id, date: d.date }))}
-                            style={{ border: 0, cursor: shift || hasOpenCandidate ? "pointer" : "default", width: "100%" }}
-                            aria-label={shift ? undefined : hasOpenCandidate ? t("planner.assignAction") : undefined}
+                            onClick={() => shift ? setEditing(shift) : setNewShift({ userId: employee.id, date: d.date, startTime: "09:00", endTime: "17:00", locationId: location === "all" ? (employees.find((p) => p.id === employee.id)?.currentLocationId ?? locations[0]?.id ?? "") : location })}
+                            style={{ border: 0, cursor: "pointer", width: "100%" }}
+                            aria-label={shift ? "Edit shift" : "Add shift"}
                           >
                             {shift ? <><i /><span>{shift.startTime}–{shift.endTime}</span></> : <span>—</span>}
                           </button>
@@ -414,8 +419,11 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
               <button className="modal-close" onClick={() => setEditing(null)} aria-label={t("common.close")}><X size={18} /></button>
               <div className="modal-orb transfer-orb"><CalendarDays size={22} /></div>
               <span className="modal-kicker">{t("planner.shiftKicker")}</span>
-              <h2>{editing.date} · {editing.startTime}–{editing.endTime}</h2>
-              <p>{t("planner.shiftModalBody")}</p>
+              <h2>Edit shift</h2>
+              <div className="transfer-form">
+                <label><span>Employee</span><select value={editing.userId ?? ""} onChange={(e) => setEditing({ ...editing, userId: e.target.value || null })}><option value="">Unassigned</option>{employees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
+                <div className="date-fields"><label><span>Date</span><input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} /></label><label><span>Start</span><input type="time" value={editing.startTime} onChange={(e) => setEditing({ ...editing, startTime: e.target.value })} /></label><label><span>End</span><input type="time" value={editing.endTime} onChange={(e) => setEditing({ ...editing, endTime: e.target.value })} /></label></div>
+              </div>
               {conflicts.length > 0 && (
                 <div className="geofence-monitor warning">
                   <AlertTriangle size={18} />
@@ -424,12 +432,22 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
               )}
               <div className="modal-account-actions">
                 <button className="secondary-button" onClick={() => { onAssign(editing.id, null); setEditing(null); }}>{t("planner.unassign")}</button>
+                <button className="row-action" onClick={async () => { if (confirm("Delete this shift?")) { await onDeleteShift(editing.id); setEditing(null); } }}>Delete</button>
+                <button className="primary-button modal-action" disabled={savingShift} onClick={async () => { setSavingShift(true); try { await onUpdateShift(editing.id, { userId: editing.userId, date: editing.date, startTime: editing.startTime, endTime: editing.endTime }); setEditing(null); } finally { setSavingShift(false); } }}>Save changes</button>
                 <button className="primary-button modal-action" onClick={() => { onRequestCoverage(editing.id); setEditing(null); }}><Send size={15} /> {t("planner.requestCoverage")}</button>
               </div>
             </section>
           </div>
         );
       })()}
+
+      {newShift && (
+        <div className="modal-backdrop" onMouseDown={() => setNewShift(null)}><section className="ai-modal transfer-modal" onMouseDown={(e) => e.stopPropagation()}>
+          <button className="modal-close" onClick={() => setNewShift(null)} aria-label={t("common.close")}><X size={18} /></button><div className="modal-orb transfer-orb"><CalendarDays size={22} /></div><span className="modal-kicker">Manual shift</span><h2>Add a shift</h2>
+          <div className="transfer-form"><label><span>Employee</span><select value={newShift.userId} onChange={(e) => setNewShift({ ...newShift, userId: e.target.value })}>{employees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label><div className="date-fields"><label><span>Date</span><input type="date" value={newShift.date} onChange={(e) => setNewShift({ ...newShift, date: e.target.value })} /></label><label><span>Start</span><input type="time" value={newShift.startTime} onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })} /></label><label><span>End</span><input type="time" value={newShift.endTime} onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })} /></label></div></div>
+          <div className="modal-account-actions"><button className="secondary-button" onClick={() => setNewShift(null)}>{t("common.close")}</button><button className="primary-button modal-action" disabled={savingShift || !newShift.userId || !newShift.locationId} onClick={async () => { setSavingShift(true); try { await onCreateShift({ ...newShift, published: !hasDraft }); setNewShift(null); } finally { setSavingShift(false); } }}>Add shift</button></div>
+        </section></div>
+      )}
 
       {assignTarget && (() => {
         const employee = employees.find((e) => e.id === assignTarget.employeeId);

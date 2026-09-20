@@ -374,6 +374,9 @@ export default function AppShell({
                   onPublish={publishWeek}
                   onAssign={async (shiftId: string, userId: string | null) => { try { await api(`/api/shifts/${shiftId}`, { method: "PATCH", body: JSON.stringify({ userId }) }); await loadAll(); } catch (e) { fail(e); } }}
                   onRequestCoverage={async (shiftId: string) => { try { await api("/api/coverage", { method: "POST", body: JSON.stringify({ shiftId }) }); await loadAll(); } catch (e) { fail(e); } }}
+                  onCreateShift={async (input) => { try { await api("/api/shifts", { method: "POST", body: JSON.stringify(input) }); await loadAll(); } catch (e) { fail(e); throw e; } }}
+                  onUpdateShift={async (id, input) => { try { await api(`/api/shifts/${id}`, { method: "PATCH", body: JSON.stringify(input) }); await loadAll(); } catch (e) { fail(e); throw e; } }}
+                  onDeleteShift={async (id) => { try { await api(`/api/shifts/${id}`, { method: "DELETE" }); await loadAll(); } catch (e) { fail(e); throw e; } }}
                 />
               )}
               {activeNav === "timetracking" && <TimeTrackingView location={selectedLocation ?? locations[0] ?? null} locations={locations} employees={employees} currentUser={currentUser} shift={currentUserToday} onError={fail} />}

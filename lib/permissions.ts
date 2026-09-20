@@ -57,6 +57,8 @@ const MANAGER_BASE = new Set<Capability>([
   "schedule.edit",
   "schedule.generate",
   "schedule.publish",
+  "schedule.edit_published",
+  "schedule.override_ai",
   "coverage.manage",
   "tasks.manage",
   "attendance.manage",
