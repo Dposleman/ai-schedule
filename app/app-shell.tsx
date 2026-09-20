@@ -116,6 +116,7 @@ export default function AppShell({
   const [aiModal, setAiModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateResult, setGenerateResult] = useState<{ created: number; open: number; coverage: number } | null>(null);
+  const [generationScope, setGenerationScope] = useState<"week" | "pay-period">("week");
   const [transferTarget, setTransferTarget] = useState<EmployeeT | null>(null);
 
   const fail = (error: unknown) => setBanner(error instanceof Error ? error.message : t("common.somethingWrong"));
@@ -236,7 +237,7 @@ export default function AppShell({
     try {
       const result = await api<{ created: number; open: number; coverage: number }>("/api/shifts/generate", {
         method: "POST",
-        body: JSON.stringify({ weekStart, locationIds: location === "all" ? undefined : [location] }),
+        body: JSON.stringify({ weekStart, locationIds: location === "all" ? undefined : [location], scope: generationScope }),
       });
       setGenerateResult(result);
       await loadAll();
@@ -419,6 +420,7 @@ export default function AppShell({
                   locations={locations}
                   onUpdateOrgLogo={async (logoUrl: string | null) => { try { await api("/api/organization", { method: "PATCH", body: JSON.stringify({ logoUrl }) }); await loadAll(); } catch (e) { fail(e); } }}
                   onUpdateLocationLogo={async (locationId: string, logoUrl: string | null) => { try { await api(`/api/locations/${locationId}`, { method: "PATCH", body: JSON.stringify({ logoUrl }) }); await loadAll(); } catch (e) { fail(e); } }}
+                  onUpdatePayPeriod={async (payPeriodStartDay: number) => { try { await api("/api/organization", { method: "PATCH", body: JSON.stringify({ payPeriodStartDay }) }); await loadAll(); } catch (e) { fail(e); } }}
                 />
               )}
               {activeNav === "billing" && currentUser.role === "owner" && <BillingView employees={employees} locations={locations} onError={fail} />}
@@ -445,11 +447,13 @@ export default function AppShell({
                 <span className="modal-kicker">{t("ai.kicker")}</span>
                 <h2>{t("ai.title", { range: formatWeekRange(weekStart, lang) })}</h2>
                 <p>{t("ai.description")}</p>
+                <label className="generation-scope"><span>Planning period</span><select value={generationScope} onChange={(e) => setGenerationScope(e.target.value as "week" | "pay-period")}><option value="week">This week</option><option value="pay-period">Full payroll period</option></select></label>
                 <div className="rule-list">
                   <span><Check size={15} /> {t("ai.employeesConsidered", { count: locationEmployees.length })}</span>
                   <span><Check size={15} /> {t("ai.absencesRespected")}</span>
                   <span><Check size={15} /> {t("ai.unavailabilityRespected")}</span>
                   <span><Check size={15} /> {t("ai.hoursBalanced")}</span>
+                  <span><Check size={15} /> Weekly and monthly targets respected</span>
                 </div>
                 <button className="primary-button modal-action" onClick={generateSchedule} disabled={generating}>
                   {generating ? <><LoaderCircle className="spin" size={17} /> {t("ai.generating")}</> : <><WandSparkles size={17} /> {t("ai.generate")}</>}

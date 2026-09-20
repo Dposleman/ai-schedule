@@ -5,6 +5,9 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   // Data URI (small PNG/JPG/SVG, capped client + server side) — optional, shown small in the sidebar.
   logoUrl: text("logo_url"),
+  // Day on which a payroll/scheduling period starts: 1 means calendar month,
+  // while 15 and 20 support common mid-month payroll cycles.
+  payPeriodStartDay: integer("pay_period_start_day").notNull().default(1),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });
 
@@ -45,6 +48,7 @@ export const users = pgTable("users", {
   currentLocationId: text("current_location_id").references(() => locations.id, { onDelete: "set null" }),
   hourlyRateCents: integer("hourly_rate_cents").notNull().default(0),
   weeklyHourTarget: integer("weekly_hour_target").notNull().default(0),
+  monthlyHourTarget: integer("monthly_hour_target").notNull().default(0),
   language: text("language").notNull().default("en"),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });

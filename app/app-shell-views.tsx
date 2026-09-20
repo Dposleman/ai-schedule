@@ -863,13 +863,14 @@ export function CostsView({ locations, employees, shifts }: { locations: Locatio
 /* ---------------- Team ---------------- */
 export function TeamView({ employees, locations, onTransfer, onEdit }: {
   employees: EmployeeT[]; locations: LocationT[]; onTransfer: (employee: EmployeeT) => void;
-  onEdit: (employeeId: string, patch: { occupation: string; weeklyHourTarget: number; hourlyRate: number }) => Promise<void>;
+  onEdit: (employeeId: string, patch: { occupation: string; weeklyHourTarget: number; monthlyHourTarget: number; hourlyRate: number }) => Promise<void>;
 }) {
   const { t, locale } = useLanguage();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<EmployeeT | null>(null);
   const [occupation, setOccupation] = useState("");
   const [weeklyHourTarget, setWeeklyHourTarget] = useState("");
+  const [monthlyHourTarget, setMonthlyHourTarget] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [saving, setSaving] = useState(false);
   const filtered = employees.filter((e) => `${e.name} ${e.occupation}`.toLowerCase().includes(query.toLowerCase()));
@@ -879,13 +880,14 @@ export function TeamView({ employees, locations, onTransfer, onEdit }: {
     setEditing(person);
     setOccupation(person.occupation);
     setWeeklyHourTarget(String(person.weeklyHourTarget ?? 0));
+    setMonthlyHourTarget(String(person.monthlyHourTarget ?? 0));
     setHourlyRate(((person.hourlyRateCents ?? 0) / 100).toFixed(2));
   };
   const save = async () => {
     if (!editing) return;
     setSaving(true);
     try {
-      await onEdit(editing.id, { occupation: occupation.trim(), weeklyHourTarget: Number(weeklyHourTarget) || 0, hourlyRate: Number(hourlyRate) || 0 });
+      await onEdit(editing.id, { occupation: occupation.trim(), weeklyHourTarget: Number(weeklyHourTarget) || 0, monthlyHourTarget: Number(monthlyHourTarget) || 0, hourlyRate: Number(hourlyRate) || 0 });
       setEditing(null);
     } finally { setSaving(false); }
   };
@@ -922,6 +924,7 @@ export function TeamView({ employees, locations, onTransfer, onEdit }: {
               <label><span>{t("team.occupationLabel")}</span><input value={occupation} onChange={(e) => setOccupation(e.target.value)} maxLength={100} /></label>
               <div className="date-fields">
                 <label><span>{t("team.weeklyTargetLabel")}</span><input type="number" min={0} max={80} value={weeklyHourTarget} onChange={(e) => setWeeklyHourTarget(e.target.value)} /></label>
+                <label><span>Monthly hour target</span><input type="number" min={0} max={320} value={monthlyHourTarget} onChange={(e) => setMonthlyHourTarget(e.target.value)} placeholder="160" /></label>
                 <label><span>{t("team.rateLabel")}</span><input type="number" min={0} step="0.01" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} /></label>
               </div>
             </div>
@@ -1435,11 +1438,12 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
 }
 
 /* ---------------- Settings ---------------- */
-export function SettingsView({ permissions, onToggle, organization, locations, onUpdateOrgLogo, onUpdateLocationLogo }: {
+export function SettingsView({ permissions, onToggle, organization, locations, onUpdateOrgLogo, onUpdateLocationLogo, onUpdatePayPeriod }: {
   permissions: PermissionsT; onToggle: (key: keyof PermissionsT) => void;
   organization: OrgT | null; locations: LocationT[];
   onUpdateOrgLogo: (logoUrl: string | null) => void;
   onUpdateLocationLogo: (locationId: string, logoUrl: string | null) => void;
+  onUpdatePayPeriod: (payPeriodStartDay: number) => void;
 }) {
   const { t, lang, setLang } = useLanguage();
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -1482,6 +1486,11 @@ export function SettingsView({ permissions, onToggle, organization, locations, o
           </div>
         </div>
       </article>
+
+      {organization && <>
+        <h3 className="settings-section-title">Planning & payroll period</h3>
+        <article className="data-card permission-card"><div className="permission-row"><div><strong>Payroll period starts on</strong><span>The Smart Planner keeps each person&apos;s monthly target inside this period.</span></div><select value={organization.payPeriodStartDay ?? 1} onChange={(e) => onUpdatePayPeriod(Number(e.target.value))}><option value={1}>1st of each month</option><option value={15}>15th to 14th</option><option value={20}>20th to 19th</option></select></div></article>
+      </>}
 
       {organization && locations && onUpdateOrgLogo && onUpdateLocationLogo && (
         <>

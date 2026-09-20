@@ -26,7 +26,7 @@ export type LocationT = {
   verified: number;
 };
 
-export type OrgT = { id: string; name: string; logoUrl: string | null };
+export type OrgT = { id: string; name: string; logoUrl: string | null; payPeriodStartDay: number };
 
 // hourlyRateCents/weeklyHourTarget are management-only data: GET
 // /api/employees now omits them entirely for employee-role callers (see
@@ -35,7 +35,7 @@ export type OrgT = { id: string; name: string; logoUrl: string | null };
 export type EmployeeT = {
   id: string; name: string; email: string; role: Role; occupation: string; phone: string;
   color: string; homeLocationId: string | null; currentLocationId: string | null;
-  hourlyRateCents?: number; weeklyHourTarget?: number;
+  hourlyRateCents?: number; weeklyHourTarget?: number; monthlyHourTarget?: number;
 };
 
 export type ShiftT = {

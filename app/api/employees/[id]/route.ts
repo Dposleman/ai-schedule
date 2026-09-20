@@ -15,6 +15,7 @@ const patchEmployeeSchema = z.object({
   homeLocationId: zId.optional(),
   hourlyRate: z.coerce.number().nonnegative().optional(),
   weeklyHourTarget: z.coerce.number().nonnegative().optional(),
+  monthlyHourTarget: z.coerce.number().nonnegative().optional(),
   role: z.enum(["owner", "manager", "employee"]).optional(),
 });
 
@@ -52,6 +53,7 @@ export const PATCH = withRoute(async (request: NextRequest, { params }: { params
   if (data.homeLocationId !== undefined && !isSelf) patch.homeLocationId = data.homeLocationId;
   if (data.hourlyRate !== undefined && !isSelf) patch.hourlyRateCents = Math.round(data.hourlyRate * 100);
   if (data.weeklyHourTarget !== undefined && !isSelf) patch.weeklyHourTarget = data.weeklyHourTarget;
+  if (data.monthlyHourTarget !== undefined && !isSelf) patch.monthlyHourTarget = data.monthlyHourTarget;
   if (data.role !== undefined && user.role === "owner" && !isSelf) patch.role = data.role;
 
   await db.update(users).set(patch).where(eq(users.id, id));

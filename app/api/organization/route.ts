@@ -16,8 +16,9 @@ const patchOrganizationSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     logoUrl: z.union([zDataUriImage(MAX_LOGO_BYTES), z.null()]).optional(),
+    payPeriodStartDay: z.coerce.number().int().min(1).max(28).optional(),
   })
-  .refine((body) => body.name !== undefined || body.logoUrl !== undefined, {
+  .refine((body) => body.name !== undefined || body.logoUrl !== undefined || body.payPeriodStartDay !== undefined, {
     message: "Nothing to update.",
   });
 
@@ -41,12 +42,14 @@ export const PATCH = withRoute(async (request: NextRequest) => {
   const patch: Partial<typeof organizations.$inferInsert> = {};
   if (data.name !== undefined) patch.name = data.name;
   if (data.logoUrl !== undefined) patch.logoUrl = data.logoUrl;
+  if (data.payPeriodStartDay !== undefined) patch.payPeriodStartDay = data.payPeriodStartDay;
   if (Object.keys(patch).length === 0) return badRequest("Nothing to update.");
 
   await db.update(organizations).set(patch).where(eq(organizations.id, user.orgId));
   await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "organization.update", "organization", user.orgId, {
     name: data.name,
     logoUrlChanged: data.logoUrl !== undefined,
+    payPeriodStartDay: data.payPeriodStartDay,
   });
   return NextResponse.json({ ok: true });
 });

@@ -1,7 +1,8 @@
 import { db } from "@/db";
-import { shifts, users, absenceRequests, unavailability } from "@/db/schema";
+import { shifts, users, absenceRequests, unavailability, organizations } from "@/db/schema";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { newId } from "@/lib/auth";
+import { payPeriodFor } from "@/lib/pay-period";
 
 const SHIFT_BLOCKS = [
   { start: "10:00", end: "18:00" },
@@ -44,12 +45,14 @@ function blocksOverlap(a: { start: string; end: string }, b: { start: string; en
  * Soft goal: balance hours across employees with the same role while
  * keeping every location staffed across the week.
  */
-export async function generateWeekSchedule(orgId: string, weekStart: string, locationIds: string[]) {
-  const monday = new Date(`${weekStart}T00:00:00`);
-  const weekDates = Array.from({ length: 7 }, (_, i) => toISODate(addDays(monday, i)));
-  const weekEnd = weekDates[6];
+export async function generateSchedule(orgId: string, rangeStart: string, rangeEnd: string, locationIds: string[]) {
+  const start = new Date(`${rangeStart}T00:00:00Z`);
+  const days = Math.round((new Date(`${rangeEnd}T00:00:00Z`).getTime() - start.getTime()) / 86_400_000) + 1;
+  const weekDates = Array.from({ length: days }, (_, i) => toISODate(addDays(start, i)));
 
   const staff = await db.select().from(users).where(eq(users.orgId, orgId));
+  const [organization] = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
+  const payPeriod = payPeriodFor(rangeStart, organization?.payPeriodStartDay ?? 1);
   const eligibleStaff = staff.filter(
     (person) => person.role !== "owner" && (!person.currentLocationId || locationIds.includes(person.currentLocationId) || locationIds.includes(person.homeLocationId ?? ""))
   );
@@ -76,13 +79,26 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
       and(
         eq(shifts.orgId, orgId),
         eq(shifts.published, 0),
-        gte(shifts.date, weekStart),
-        lte(shifts.date, weekEnd),
+        gte(shifts.date, rangeStart),
+        lte(shifts.date, rangeEnd),
         inArray(shifts.locationId, locationIds)
       )
     );
 
-  const hoursAssigned = new Map<string, number>(eligibleStaff.map((person) => [person.id, 0]));
+  // Include published and pre-existing shifts in both caps. Regenerating a
+  // single week can therefore never push someone past their payroll-period
+  // target because of shifts already planned earlier in that period.
+  const existing = await db.select().from(shifts).where(and(eq(shifts.orgId, orgId), gte(shifts.date, payPeriod.start), lte(shifts.date, payPeriod.end)));
+  const monthlyHours = new Map<string, number>(eligibleStaff.map((person) => [person.id, 0]));
+  const weeklyHours = new Map<string, number>();
+  for (const shift of existing) {
+    if (!shift.userId) continue;
+    const hours = hoursBetween(shift.startTime, shift.endTime);
+    monthlyHours.set(shift.userId, (monthlyHours.get(shift.userId) ?? 0) + hours);
+    const weekKey = `${shift.userId}|${toISODate(addDays(new Date(`${shift.date}T00:00:00Z`), -((new Date(`${shift.date}T00:00:00Z`).getUTCDay() + 6) % 7)))}`;
+    weeklyHours.set(weekKey, (weeklyHours.get(weekKey) ?? 0) + hours);
+  }
+  const hoursAssigned = new Map<string, number>(eligibleStaff.map((person) => [person.id, monthlyHours.get(person.id) ?? 0]));
   // Tracks the time blocks already assigned to each person on each date
   // (key: "personId|date") so a candidate whose new block would overlap an
   // assignment they already have that day is excluded.
@@ -104,11 +120,17 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
             return !existing.some((assigned) => blocksOverlap(assigned, block));
           })
           .filter((person) => {
-            const target = person.weeklyHourTarget || 40;
-            const already = hoursAssigned.get(person.id) ?? 0;
-            return already + hoursBetween(block.start, block.end) <= target;
+            const hours = hoursBetween(block.start, block.end);
+            const weekKey = `${person.id}|${toISODate(addDays(new Date(`${date}T00:00:00Z`), -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7)))}`;
+            const weeklyTarget = person.weeklyHourTarget || 40;
+            const monthlyTarget = person.monthlyHourTarget || weeklyTarget * 4;
+            return (weeklyHours.get(weekKey) ?? 0) + hours <= weeklyTarget && (monthlyHours.get(person.id) ?? 0) + hours <= monthlyTarget;
           })
-          .sort((a, b) => (hoursAssigned.get(a.id) ?? 0) - (hoursAssigned.get(b.id) ?? 0));
+          .sort((a, b) => {
+            const aTarget = a.monthlyHourTarget || (a.weeklyHourTarget || 40) * 4;
+            const bTarget = b.monthlyHourTarget || (b.weeklyHourTarget || 40) * 4;
+            return (monthlyHours.get(a.id) ?? 0) / aTarget - (monthlyHours.get(b.id) ?? 0) / bTarget;
+          });
 
         const chosen = candidates[0];
         const shiftId = newId("shift");
@@ -126,7 +148,11 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
           published: 0,
         });
         if (chosen) {
-          hoursAssigned.set(chosen.id, (hoursAssigned.get(chosen.id) ?? 0) + hoursBetween(block.start, block.end));
+          const hours = hoursBetween(block.start, block.end);
+          hoursAssigned.set(chosen.id, (hoursAssigned.get(chosen.id) ?? 0) + hours);
+          monthlyHours.set(chosen.id, (monthlyHours.get(chosen.id) ?? 0) + hours);
+          const weekKey = `${chosen.id}|${toISODate(addDays(new Date(`${date}T00:00:00Z`), -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7)))}`;
+          weeklyHours.set(weekKey, (weeklyHours.get(weekKey) ?? 0) + hours);
           const key = `${chosen.id}|${date}`;
           const existing = assignedBlocksByPersonDate.get(key) ?? [];
           existing.push({ start: block.start, end: block.end });
@@ -144,5 +170,10 @@ export async function generateWeekSchedule(orgId: string, weekStart: string, loc
   const openShifts = created.filter((shift) => shift.status === "open").length;
   const coverage = totalShifts === 0 ? 100 : Math.round(((totalShifts - openShifts) / totalShifts) * 100);
 
-  return { created: created.length, open: openShifts, coverage, weekStart, weekEnd };
+  return { created: created.length, open: openShifts, coverage, weekStart: rangeStart, weekEnd: rangeEnd, payPeriod };
+}
+
+export async function generateWeekSchedule(orgId: string, weekStart: string, locationIds: string[]) {
+  const monday = new Date(`${weekStart}T00:00:00Z`);
+  return generateSchedule(orgId, weekStart, toISODate(addDays(monday, 6)), locationIds);
 }

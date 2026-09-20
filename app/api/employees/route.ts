@@ -21,8 +21,8 @@ export const GET = withRoute(async () => {
   // directory) must never see a colleague's, or even their own, pay rate
   // through it. Owners and managers get the full row.
   const canSeeCompensation = user.role === "owner" || user.role === "manager";
-  const safe = rows.map(({ passwordHash: _passwordHash, hourlyRateCents, weeklyHourTarget, ...rest }) =>
-    canSeeCompensation ? { ...rest, hourlyRateCents, weeklyHourTarget } : rest
+  const safe = rows.map(({ passwordHash: _passwordHash, hourlyRateCents, weeklyHourTarget, monthlyHourTarget, ...rest }) =>
+    canSeeCompensation ? { ...rest, hourlyRateCents, weeklyHourTarget, monthlyHourTarget } : rest
   );
   return NextResponse.json({ employees: safe });
 });
@@ -40,6 +40,7 @@ const createEmployeeSchema = z.object({
   locationId: zId.optional(),
   hourlyRate: z.coerce.number().nonnegative().optional().default(0),
   weeklyHourTarget: z.coerce.number().nonnegative().optional().default(37),
+  monthlyHourTarget: z.coerce.number().nonnegative().optional().default(0),
 });
 
 export const POST = withRoute(async (request: NextRequest) => {
@@ -81,6 +82,7 @@ export const POST = withRoute(async (request: NextRequest) => {
     currentLocationId: data.locationId || user.currentLocationId,
     hourlyRateCents: Math.round(data.hourlyRate * 100),
     weeklyHourTarget: data.weeklyHourTarget,
+    monthlyHourTarget: data.monthlyHourTarget,
   });
 
   await recordAuditEvent(user.orgId, { id: user.id, name: user.name }, "employee.create", "user", id, {
