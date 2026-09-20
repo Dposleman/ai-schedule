@@ -385,7 +385,7 @@ export default function AppShell({
                   onRequest={async (type: string, startDate: string, endDate: string, note: string) => { try { await api("/api/absences", { method: "POST", body: JSON.stringify({ type, startDate, endDate, note }) }); await loadAll(); } catch (e) { fail(e); } }} />
               )}
               {activeNav === "absences" && currentUser.role !== "employee" && (
-                <AbsencesView absences={absences} employees={employees}
+                <AbsencesView absences={absences} employees={employees} shifts={shifts}
                   onDecide={async (id: string, status: string) => { try { await api(`/api/absences/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); await loadAll(); } catch (e) { fail(e); } }} />
               )}
               {activeNav === "chat" && (
@@ -394,7 +394,7 @@ export default function AppShell({
                   onAccept={async (id: string) => { try { await api(`/api/coverage/${id}/accept`, { method: "POST" }); await loadAll(); } catch (e) { fail(e); } }} />
               )}
               {activeNav === "staff" && <StaffDirectoryView employees={employees} locations={locations} />}
-              {activeNav === "locations" && <LocationsView locations={locations} employees={employees} currentUser={currentUser} onCreate={async (name: string) => { try { await api("/api/locations", { method: "POST", body: JSON.stringify({ name }) }); await loadAll(); } catch (e) { fail(e); } }} onOpenStaff={() => setActiveNav("staff")} />}
+              {activeNav === "locations" && <LocationsView locations={locations} employees={employees} currentUser={currentUser} onCreate={async (name: string) => { try { await api("/api/locations", { method: "POST", body: JSON.stringify({ name }) }); await loadAll(); } catch (e) { fail(e); } }} onOpenStaff={() => setActiveNav("staff")} onVerify={async (id: string, latitude: number, longitude: number, radiusMeters: number) => { try { await api(`/api/locations/${id}`, { method: "PATCH", body: JSON.stringify({ latitude, longitude, radiusMeters }) }); await loadAll(); } catch (e) { fail(e); } }} />}
               {activeNav === "accounts" && currentUser.role !== "employee" && (
                 <AccountsView employees={employees} locations={locations} currentUser={currentUser}
                   onCreate={async (payload: Record<string, unknown>) => { try { const result = await api<{ temporaryPassword: string | null; emailed: boolean }>("/api/employees", { method: "POST", body: JSON.stringify(payload) }); await loadAll(); return result; } catch (e) { fail(e); return null; } }}

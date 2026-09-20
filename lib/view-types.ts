@@ -19,6 +19,11 @@ export type LocationT = {
   id: string; name: string; address: string; openHours: string;
   latitude: number; longitude: number; radiusMeters: number; budgetCents?: number;
   logoUrl: string | null;
+  // 0 until an owner/manager confirms the coordinates (see
+  // app/api/locations/route.ts) — GPS check-in is refused server-side until
+  // then (app/api/attendance/route.ts), so the UI surfaces this instead of
+  // letting staff hit a silent check-in failure.
+  verified: number;
 };
 
 export type OrgT = { id: string; name: string; logoUrl: string | null };

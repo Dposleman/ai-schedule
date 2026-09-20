@@ -371,7 +371,7 @@ export function PlannerView({ employees, shifts, locations, location, weekStart,
       {editing && (
         <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
           <section className="ai-modal transfer-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setEditing(null)}><X size={18} /></button>
+            <button className="modal-close" onClick={() => setEditing(null)} aria-label={t("common.close")}><X size={18} /></button>
             <div className="modal-orb transfer-orb"><CalendarDays size={22} /></div>
             <span className="modal-kicker">{t("planner.shiftKicker")}</span>
             <h2>{editing.date} · {editing.startTime}–{editing.endTime}</h2>
@@ -448,6 +448,12 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: {
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("time.kicker")}</span><h2>{t("time.title", { radius: location.radiusMeters })}</h2><p>{t("time.subtitle")}</p></div><span className={`geo-status ${inside ? "inside" : "outside"}`}><MapPin size={15} /> {distance === null ? t("time.pending") : inside ? t("time.inside") : t("time.outside")}</span></div>
+      {!location.verified && (
+        <div className="geofence-monitor warning">
+          <AlertTriangle size={18} />
+          <div><strong>{t("time.unverifiedTitle")}</strong><span>{t("time.unverifiedBody")}</span></div>
+        </div>
+      )}
       <section className="geo-card">
         <div className="geo-radar"><span className={inside ? "device-dot inside" : "device-dot"} /><i /><b>{location.radiusMeters} m</b></div>
         <div className="geo-copy">
@@ -461,7 +467,7 @@ export function TimeTrackingView({ location, currentUser, shift, onError }: {
           <small>{shift ? t("time.todayShift") : t("time.noShiftToday")}</small>
           <strong>{shift ? `${shift.startTime}–${shift.endTime}` : "—"}</strong>
           {!loaded ? null : !open ? (
-            <button className="primary-button" disabled={!inside} onClick={checkIn}><Fingerprint size={17} /> {t("time.checkIn")}</button>
+            <button className="primary-button" disabled={!inside || !location.verified} onClick={checkIn}><Fingerprint size={17} /> {location.verified ? t("time.checkIn") : t("time.checkInBlocked")}</button>
           ) : (
             <><span className="clocked"><i /> {t("time.checkedInAt", { time: new Date(open.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</span><button className="primary-button" onClick={checkOut}>{t("time.checkOut")}</button></>
           )}
@@ -545,21 +551,27 @@ export function CostsView({ locations, employees, shifts }: { locations: Locatio
         <div className="card-heading"><div><h3>{t("costs.budgetByLocation")}</h3><p>{t("costs.budgetSubtitle")}</p></div><Bot size={20} /></div>
         {locations.map((loc) => {
           const locShifts = shifts.filter((s) => s.locationId === loc.id && s.userId);
-          const actualCents = locShifts.reduce((sum, s) => {
+          // This is the SCHEDULED (forecast) labour cost — every assigned
+          // shift's hours × rate, whether or not it's been worked yet. It is
+          // not the approved/actual payroll figure (11.4 wants those kept
+          // visually distinct); that needs manager-reviewed timesheets,
+          // which this build doesn't have yet — see the project doc.
+          const forecastCents = locShifts.reduce((sum, s) => {
             const emp = employees.find((e) => e.id === s.userId);
             return sum + (emp ? (emp.hourlyRateCents ?? 0) * hoursBetween(s.startTime, s.endTime) : 0);
           }, 0);
           const budgetCents = loc.budgetCents ?? 0;
-          const percent = budgetCents > 0 ? Math.round((actualCents / budgetCents) * 100) : 0;
+          const percent = budgetCents > 0 ? Math.round((forecastCents / budgetCents) * 100) : 0;
           return (
             <div className="budget-row" key={loc.id}>
-              <div><strong>{loc.name}</strong><span>{money(actualCents, locale)} {(loc.budgetCents ?? 0) > 0 ? `/ ${money(loc.budgetCents ?? 0, locale)}` : t("costs.noBudget")}</span></div>
+              <div><strong>{loc.name}</strong><span>{money(forecastCents, locale)} {(loc.budgetCents ?? 0) > 0 ? `/ ${money(loc.budgetCents ?? 0, locale)}` : t("costs.noBudget")}</span></div>
               <div className="budget-track"><i style={{ width: `${Math.min(percent, 100)}%` }} /></div>
               <em className={`status-pill ${percent > 100 ? "away" : "available"}`}>{(loc.budgetCents ?? 0) === 0 ? t("costs.setBudget") : percent > 100 ? t("costs.overBudget") : t("costs.onTarget")}</em>
             </div>
           );
         })}
         {locations.length === 0 && <div className="empty-state">{t("costs.noLocations")}</div>}
+        <p className="preview-note">{t("costs.forecastNote")}</p>
       </article>
     </div>
   );
@@ -627,27 +639,38 @@ export function TransfersView({ employees, locations, transfers, onNew, onComple
 }
 
 /* ---------------- Absences (manager) ---------------- */
-export function AbsencesView({ absences, employees, onDecide }: {
-  absences: AbsenceT[]; employees: EmployeeT[]; onDecide: (id: string, status: string) => void;
+export function AbsencesView({ absences, employees, shifts, onDecide }: {
+  absences: AbsenceT[]; employees: EmployeeT[]; shifts: ShiftT[]; onDecide: (id: string, status: string) => void;
 }) {
   const { t } = useLanguage();
   const employeeName = (id: string) => employees.find((e) => e.id === id)?.name ?? "—";
   const pending = absences.filter((a) => a.status === "pending");
   const decided = absences.filter((a) => a.status !== "pending").slice(0, 6);
+  // Impact on published shifts (11.4: "manager approval queue with impact on
+  // published shifts") — a published, assigned shift for this employee that
+  // falls inside the requested window would go uncovered if approved.
+  const affectedShifts = (request: AbsenceT) => shifts.filter((s) => s.userId === request.userId && s.published === 1 && s.date >= request.startDate && s.date <= request.endDate);
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("absences.kicker")}</span><h2>{t("absences.title")}</h2><p>{t("absences.subtitle")}</p></div></div>
       <section className="absence-layout">
         <section className="requests-column">
           <div className="card-heading no-border"><div><h3>{t("absences.pending")}</h3></div><span>{pending.length}</span></div>
-          {pending.map((request) => (
+          {pending.map((request) => {
+            const affected = affectedShifts(request);
+            return (
             <article className="request-card featured-request" key={request.id}>
               <div className="request-person"><span className="avatar pink">{initials(employeeName(request.userId))}</span><div><strong>{employeeName(request.userId)}</strong></div><em>{absenceLabel(t, request.type).toUpperCase()}</em></div>
               <div className="request-period"><CalendarDays size={17} /><span><small>{t("absences.requestedPeriod")}</small><strong>{request.startDate} – {request.endDate}</strong></span></div>
               {request.note && <p style={{ margin: "6px 0", fontSize: 12, color: "var(--muted)" }}>{request.note}</p>}
+              {affected.length > 0 ? (
+                <div className="impact-warning"><AlertTriangle size={15} /><div><strong>{t("absences.impactWarningTitle")}</strong><span>{t("absences.impactWarningBody", { count: affected.length })}</span></div></div>
+              ) : (
+                <div className="impact-ok"><CheckCircle2 size={15} /><div><strong>{t("absences.impactOkTitle")}</strong><span>{t("absences.impactOkBody")}</span></div></div>
+              )}
               <div className="request-actions"><button className="secondary-button" onClick={() => onDecide(request.id, "rejected")}>{t("absences.reject")}</button><button className="primary-button" onClick={() => onDecide(request.id, "approved")}><Check size={15} /> {t("absences.approve")}</button></div>
             </article>
-          ))}
+          );})}
           {pending.length === 0 && <p className="empty-state">{t("absences.none")}</p>}
         </section>
         <aside className="employee-preview-card">
@@ -705,7 +728,7 @@ export function MyAbsencesView({ unavailableDays, absences, onToggleDay, onReque
       {requesting && (
         <div className="modal-backdrop" onMouseDown={() => setRequesting(false)}>
           <section className="ai-modal account-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setRequesting(false)}><X size={18} /></button>
+            <button className="modal-close" onClick={() => setRequesting(false)} aria-label={t("common.close")}><X size={18} /></button>
             <div className="modal-orb"><CalendarX2 size={22} /></div>
             <span className="modal-kicker">{t("myabsences.newRequestKicker")}</span><h2>{t("myabsences.requestAbsence")}</h2>
             <div className="transfer-form">
@@ -721,7 +744,38 @@ export function MyAbsencesView({ unavailableDays, absences, onToggleDay, onReque
   );
 }
 
-/* ---------------- Chat / automatic coverage ---------------- */
+/* ---------------- Coverage center ---------------- */
+// A purpose-built coverage queue rather than a chat feed (master prompt
+// 11.4: "replace fake-chat aesthetics with a purpose-built coverage
+// center... separate open requests, my invitations, accepted/closed and
+// escalated cases"). One request row (CoverageRow) is reused across the
+// three sections below instead of rendering everything as a flat list.
+function CoverageRow({ request, employeeName, locationName, showAccept, onAccept }: {
+  request: CoverageRequestT; employeeName: (id: string) => string; locationName: (id?: string) => string;
+  showAccept: boolean; onAccept: (id: string) => void;
+}) {
+  const { t } = useLanguage();
+  const invitedCount = request.candidates.filter((c) => c.status === "invited").length;
+  return (
+    <article className="candidate-message">
+      <span className={`avatar ${request.status === "closed" ? "green" : "orange"}`}>{request.status === "closed" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}</span>
+      <div>
+        <strong>{request.shift ? `${locationName(request.shift.locationId)} · ${request.shift.date}` : t("chat.shift")}</strong>
+        <span>{request.shift ? `${request.shift.startTime}–${request.shift.endTime}` : ""} · {request.reason}</span>
+        <p>{request.status === "closed" ? t("chat.coveredBy", { name: employeeName(request.acceptedByUserId ?? "") }) : t("chat.invited", { count: invitedCount })}</p>
+      </div>
+      {showAccept ? (
+        <button onClick={() => onAccept(request.id)}>{t("chat.acceptShift")}</button>
+      ) : (
+        // Settled state is plain status text, not a disabled button — a
+        // greyed-out but still-rendered Accept control reads as a stale
+        // action the person might still be able to press.
+        <span className="status-pill transfer">{request.status === "closed" ? t("chat.closed") : t("chat.awaitingResponse")}</span>
+      )}
+    </article>
+  );
+}
+
 export function ChatView({ coverage, employees, locations, currentUser, openShifts, onOpenCoverage, onAccept }: {
   coverage: CoverageRequestT[]; employees: EmployeeT[]; locations: LocationT[]; currentUser: CurrentUser;
   openShifts: ShiftT[]; onOpenCoverage: (shiftId: string) => void; onAccept: (id: string) => void;
@@ -729,7 +783,11 @@ export function ChatView({ coverage, employees, locations, currentUser, openShif
   const { t } = useLanguage();
   const employeeName = (id: string) => employees.find((e) => e.id === id)?.name ?? "—";
   const locationName = (id?: string) => locations.find((l) => l.id === id)?.name ?? "—";
-  const myInvites = coverage.filter((c) => c.candidates.some((cand) => cand.userId === currentUser.id));
+  const isEmployee = currentUser.role === "employee";
+  const scoped = isEmployee ? coverage.filter((c) => c.candidates.some((cand) => cand.userId === currentUser.id)) : coverage;
+  const open = scoped.filter((c) => c.status === "open");
+  const myOpenInvites = open.filter((c) => c.candidates.some((cand) => cand.userId === currentUser.id && cand.status === "invited"));
+  const closed = scoped.filter((c) => c.status === "closed");
 
   return (
     <div className="view-stack">
@@ -747,28 +805,34 @@ export function ChatView({ coverage, employees, locations, currentUser, openShif
         </article>
       )}
 
-      <div className="coverage-layout">
-        <section className="chat-card" style={{ gridColumn: "1 / -1" }}>
-          <div className="chat-head"><div><span className="chat-logo"><Sparkles size={16} /></span><span><strong>{t("chat.coverageRequests")}</strong><small>{coverage.filter((c) => c.status === "open").length} {t("chat.open")}</small></span></div></div>
+      {isEmployee && (
+        <article className="data-card">
+          <div className="card-heading"><div><h3>{t("chat.myInvitations")}</h3><p>{t("chat.myInvitationsSubtitle")}</p></div><span>{myOpenInvites.length}</span></div>
           <div className="candidate-list">
-            {(currentUser.role === "employee" ? myInvites : coverage).map((request) => (
-              <article className={`candidate-message ${request.status === "closed" ? "locked" : ""}`} key={request.id}>
-                <span className="avatar violet"><AlertTriangle size={15} /></span>
-                <div>
-                  <strong>{request.shift ? `${locationName(request.shift.locationId)} · ${request.shift.date}` : t("chat.shift")}</strong>
-                  <span>{request.shift ? `${request.shift.startTime}–${request.shift.endTime}` : ""} · {request.reason}</span>
-                  <p>{request.status === "closed" ? t("chat.coveredBy", { name: employeeName(request.acceptedByUserId ?? "") }) : t("chat.invited", { count: request.candidates.filter((c) => c.status === "invited").length })}</p>
-                </div>
-                {currentUser.role === "employee" && request.status === "open" && request.candidates.some((c) => c.userId === currentUser.id && c.status === "invited") && (
-                  <button onClick={() => onAccept(request.id)}>{t("chat.acceptShift")}</button>
-                )}
-                {request.status === "closed" && <button disabled><LockKeyhole size={13} /> {t("chat.closed")}</button>}
-              </article>
-            ))}
-            {coverage.length === 0 && <p className="empty-state">{t("chat.none")}</p>}
+            {myOpenInvites.map((request) => <CoverageRow key={request.id} request={request} employeeName={employeeName} locationName={locationName} showAccept onAccept={onAccept} />)}
+            {myOpenInvites.length === 0 && <p className="empty-state">{t("chat.noInvitations")}</p>}
           </div>
-        </section>
-      </div>
+        </article>
+      )}
+
+      <article className="data-card">
+        <div className="card-heading"><div><h3>{t("chat.openRequests")}</h3><p>{t("chat.openRequestsSubtitle")}</p></div><span>{open.length}</span></div>
+        <div className="candidate-list">
+          {(isEmployee ? open.filter((c) => !myOpenInvites.includes(c)) : open).map((request) => (
+            <CoverageRow key={request.id} request={request} employeeName={employeeName} locationName={locationName}
+              showAccept={!isEmployee ? false : request.candidates.some((c) => c.userId === currentUser.id && c.status === "invited")} onAccept={onAccept} />
+          ))}
+          {open.length === 0 && <p className="empty-state">{t("chat.noOpenRequests")}</p>}
+        </div>
+      </article>
+
+      <article className="data-card">
+        <div className="card-heading"><div><h3>{t("chat.resolved")}</h3><p>{t("chat.resolvedSubtitle")}</p></div><span>{closed.length}</span></div>
+        <div className="candidate-list">
+          {closed.slice(0, 10).map((request) => <CoverageRow key={request.id} request={request} employeeName={employeeName} locationName={locationName} showAccept={false} onAccept={onAccept} />)}
+          {closed.length === 0 && <p className="empty-state">{t("chat.none")}</p>}
+        </div>
+      </article>
     </div>
   );
 }
@@ -797,13 +861,27 @@ export function StaffDirectoryView({ employees, locations }: { employees: Employ
 }
 
 /* ---------------- Locations ---------------- */
-export function LocationsView({ locations, employees, currentUser, onCreate, onOpenStaff }: {
+export function LocationsView({ locations, employees, currentUser, onCreate, onOpenStaff, onVerify }: {
   locations: LocationT[]; employees: EmployeeT[]; currentUser: CurrentUser;
   onCreate: (name: string) => void; onOpenStaff: () => void;
+  onVerify: (id: string, latitude: number, longitude: number, radiusMeters: number) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [verifying, setVerifying] = useState<LocationT | null>(null);
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+  const [radius, setRadius] = useState("50");
+  const canManage = currentUser.role === "owner" || currentUser.role === "manager";
+
+  const openVerify = (site: LocationT) => {
+    setVerifying(site);
+    setLat(String(site.latitude));
+    setLng(String(site.longitude));
+    setRadius(String(site.radiusMeters));
+  };
+
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("locations.kicker")}</span><h2>{t("locations.count", { count: locations.length })}</h2><p>{t("locations.subtitle")}</p></div>
@@ -816,8 +894,18 @@ export function LocationsView({ locations, employees, currentUser, onCreate, onO
             <article className="location-card" key={site.id}>
               <div className="location-card-head"><span><Store size={20} /></span><div><h3>{site.name}</h3><p>{site.address || t("locations.noAddress")}</p></div></div>
               <div className="location-hours"><Clock3 size={14} /> {site.openHours}<em>{t("locations.peopleCount", { count: staff.length })}</em></div>
+              <div className={`geofence-monitor ${site.verified ? "safe" : "warning"}`} style={{ margin: "11px 0" }}>
+                {site.verified ? <ShieldCheck size={16} /> : <AlertTriangle size={16} />}
+                <div><strong>{site.verified ? t("locations.verified") : t("locations.unverified")}</strong><span>{site.verified ? t("locations.radiusNote", { radius: site.radiusMeters }) : t("locations.unverifiedNote")}</span></div>
+              </div>
+              {canManage && site.budgetCents !== undefined && (
+                <p style={{ margin: "0 0 11px", color: "var(--muted)", fontSize: 12.5 }}>{t("locations.weeklyBudget")}: <strong style={{ color: "var(--ink)" }}>{site.budgetCents > 0 ? money(site.budgetCents, locale) : t("locations.noBudgetSet")}</strong></p>
+              )}
               <div className="onsite-list">{staff.length ? staff.map((person) => <div key={person.id}><span className={`avatar ${person.color}`}>{initials(person.name)}</span><span><strong>{person.name}</strong><small>{person.occupation}</small></span></div>) : <p>{t("locations.noStaff")}</p>}</div>
-              <button className="secondary-button" onClick={onOpenStaff}>{t("locations.viewTeam")} <ArrowUpRight size={14} /></button>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button className="secondary-button" onClick={onOpenStaff} style={{ flex: 1 }}>{t("locations.viewTeam")} <ArrowUpRight size={14} /></button>
+                {canManage && <button className="secondary-button" onClick={() => openVerify(site)} style={{ flex: 1 }}><MapPin size={14} /> {t("locations.setCoordinates")}</button>}
+              </div>
             </article>
           );
         })}
@@ -827,10 +915,31 @@ export function LocationsView({ locations, employees, currentUser, onCreate, onO
       {creating && (
         <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
           <section className="ai-modal account-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setCreating(false)}><X size={18} /></button>
+            <button className="modal-close" onClick={() => setCreating(false)} aria-label={t("common.close")}><X size={18} /></button>
             <div className="modal-orb"><Store size={22} /></div><span className="modal-kicker">{t("locations.createKicker")}</span><h2>{t("locations.create")}</h2>
             <div className="transfer-form"><label><span>{t("locations.name")}</span><input value={name} onChange={(e) => setName(e.target.value)} /></label></div>
             <div className="modal-account-actions"><button className="secondary-button" onClick={() => setCreating(false)}>{t("locations.cancel")}</button><button className="primary-button" disabled={!name.trim()} onClick={() => { onCreate(name.trim()); setCreating(false); setName(""); }}>{t("locations.create")}</button></div>
+          </section>
+        </div>
+      )}
+
+      {verifying && (
+        <div className="modal-backdrop" onMouseDown={() => setVerifying(null)}>
+          <section className="ai-modal account-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setVerifying(null)} aria-label={t("common.close")}><X size={18} /></button>
+            <div className="modal-orb"><MapPin size={22} /></div><span className="modal-kicker">{t("locations.geofenceKicker")}</span><h2>{verifying.name}</h2>
+            <p>{t("locations.geofenceBody")}</p>
+            <div className="transfer-form">
+              <div className="date-fields">
+                <label><span>{t("locations.latitude")}</span><input value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" /></label>
+                <label><span>{t("locations.longitude")}</span><input value={lng} onChange={(e) => setLng(e.target.value)} inputMode="decimal" /></label>
+              </div>
+              <label><span>{t("locations.radius")}</span><input value={radius} onChange={(e) => setRadius(e.target.value)} inputMode="numeric" /></label>
+            </div>
+            <div className="modal-account-actions">
+              <button className="secondary-button" onClick={() => setVerifying(null)}>{t("locations.cancel")}</button>
+              <button className="primary-button" disabled={!lat.trim() || !lng.trim() || !radius.trim()} onClick={() => { onVerify(verifying.id, Number(lat), Number(lng), Number(radius)); setVerifying(null); }}><ShieldCheck size={15} /> {t("locations.confirmGeofence")}</button>
+            </div>
           </section>
         </div>
       )}
@@ -865,7 +974,7 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
               <span className="person-summary"><span className={`avatar ${account.color}`}>{initials(account.name)}</span><span><strong>{account.name}</strong><small>{account.email}</small></span></span>
               <em className={`access-pill ${account.role}`}>{account.role === "owner" ? <Crown size={12} /> : account.role === "manager" ? <ShieldCheck size={12} /> : <UserCheck size={12} />}{t(`role.${account.role}`)}</em>
               <span>{locations.find((l) => l.id === account.currentLocationId)?.name ?? "—"}</span>
-              <span><button className="delete-account" disabled={protectedOwner || isSelf} title={protectedOwner ? t("accounts.deleteProtected") : isSelf ? t("accounts.deleteSelf") : t("accounts.delete")} onClick={() => onDelete(account.id)}>{protectedOwner || isSelf ? <LockKeyhole size={15} /> : <Trash2 size={15} />}</button></span>
+              <span><button className="delete-account" disabled={protectedOwner || isSelf} aria-label={protectedOwner ? t("accounts.deleteProtected") : isSelf ? t("accounts.deleteSelf") : t("accounts.delete")} title={protectedOwner ? t("accounts.deleteProtected") : isSelf ? t("accounts.deleteSelf") : t("accounts.delete")} onClick={() => onDelete(account.id)}>{protectedOwner || isSelf ? <LockKeyhole size={15} /> : <Trash2 size={15} />}</button></span>
             </div>
           );
         })}
@@ -874,7 +983,7 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
       {creating && (
         <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
           <section className="ai-modal account-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setCreating(false)}><X size={18} /></button>
+            <button className="modal-close" onClick={() => setCreating(false)} aria-label={t("common.close")}><X size={18} /></button>
             <div className="modal-orb"><UserPlus size={25} /></div><span className="modal-kicker">{t("accounts.createKicker")}</span><h2>{t("accounts.createTitle")}</h2>
             {!result ? (
               <>
@@ -882,6 +991,7 @@ export function AccountsView({ employees, locations, currentUser, onCreate, onDe
                   <label><span>{t("accounts.fullName")}</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
                   <label><span>{t("accounts.email")}</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
                   <label><span>{t("accounts.access")}</span><select value={role} onChange={(e) => setRole(e.target.value)}><option value="employee">{t("role.employee")}</option><option value="manager">{t("role.manager")}</option>{currentUser.role === "owner" && <option value="owner">{t("role.owner")}</option>}</select></label>
+                  <p style={{ margin: "-6px 0 0", color: "var(--muted)", fontSize: 11.5, textAlign: "left" }}>{t(`accounts.roleExplain.${role}`)}</p>
                   <label><span>{t("accounts.location")}</span><select value={locationId} onChange={(e) => setLocationId(e.target.value)}>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
                 </div>
                 <div className="modal-account-actions">
@@ -932,11 +1042,15 @@ export function SettingsView({ permissions, onToggle, organization, locations, o
   return (
     <div className="view-stack">
       <div className="view-heading"><div><span className="view-kicker">{t("settings.kicker")}</span><h2>{t("settings.title")}</h2><p>{t("settings.subtitle")}</p></div></div>
+
+      <h3 className="settings-section-title">{t("settings.section.permissions")}</h3>
       <section className="data-card permission-card">
         {rows.map(([key, label, detail]) => (
           <div className="permission-row" key={key}><div><strong>{label}</strong><span>{detail}</span></div><button className={`toggle ${permissions[key] ? "on" : ""}`} onClick={() => onToggle(key)} aria-label={label}><i /></button></div>
         ))}
       </section>
+
+      <h3 className="settings-section-title">{t("settings.section.languageRegion")}</h3>
       <article className="data-card permission-card">
         <div className="permission-row">
           <div><strong>{t("settings.languageTitle")}</strong><span>{t("settings.languageSubtitle")}</span></div>
@@ -949,6 +1063,8 @@ export function SettingsView({ permissions, onToggle, organization, locations, o
       </article>
 
       {organization && locations && onUpdateOrgLogo && onUpdateLocationLogo && (
+        <>
+        <h3 className="settings-section-title">{t("settings.section.branding")}</h3>
         <article className="data-card permission-card branding-card">
           <div className="permission-row"><div><strong>{t("settings.brandingTitle")}</strong><span>{t("settings.brandingSubtitle")}</span></div></div>
 
@@ -983,7 +1099,18 @@ export function SettingsView({ permissions, onToggle, organization, locations, o
           ))}
           {logoError && <p className="logo-upload-error"><AlertTriangle size={13} /> {logoError}</p>}
         </article>
+        </>
       )}
+
+      <h3 className="settings-section-title">{t("settings.section.security")}</h3>
+      <article className="data-card permission-card">
+        <div className="permission-row"><div><strong>{t("settings.passwordTitle")}</strong><span>{t("settings.passwordSubtitle")}</span></div><a className="secondary-button" href="/forgot-password"><LockKeyhole size={14} /> {t("settings.changePassword")}</a></div>
+      </article>
+
+      <h3 className="settings-section-title">{t("settings.section.dataPrivacy")}</h3>
+      <article className="data-card permission-card">
+        <div className="permission-row"><div><strong>{t("settings.dataTitle")}</strong><span>{t("settings.dataSubtitle")}</span></div></div>
+      </article>
     </div>
   );
 }
