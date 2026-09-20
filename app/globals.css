@@ -670,6 +670,9 @@ button { color: inherit; font: inherit; }
 .delete-account { display: grid; width: 31px; height: 31px; place-items: center; border: 1px solid var(--danger-soft); border-radius: 8px; background: var(--danger-soft); color: var(--danger); cursor: pointer; }
 .delete-account:disabled { border-color: var(--line); background: var(--neutral-soft); color: var(--muted); cursor: not-allowed; }
 .account-modal { width: min(460px, 100%); }
+.geofence-map-wrap { position: relative; margin: 4px 0 14px; }
+.geofence-map { height: 220px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; z-index: 0; }
+.geofence-locate { position: absolute; top: 8px; right: 8px; z-index: 500; padding: 6px 9px; font-size: 11px; box-shadow: var(--shadow-sm); }
 .modal-account-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .assign-candidate-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .assign-candidate-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }

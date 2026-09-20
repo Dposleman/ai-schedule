@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type L from "leaflet";
 import { Geolocation } from "@capacitor/geolocation";
 import { apiFetch } from "@/lib/api-client";
 import { distanceInMeters } from "@/lib/geo";
@@ -577,12 +578,17 @@ function TimesheetReviewSection({ employees, locations }: { employees: EmployeeT
   const [saving, setSaving] = useState(false);
 
   const load = () => {
-    setLoading(true);
     apiFetch(`/api/attendance/timesheet?weekStart=${weekStart}&weekEnd=${weekEnd}`)
       .then((r) => r.json()).then((data) => setRecords(data.records ?? [])).finally(() => setLoading(false));
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on week change only; `load` itself is stable per render and re-including it would refetch on every render.
-  useEffect(() => { load(); }, [weekStart]);
+  useEffect(() => {
+    // Marks the week as loading as soon as it changes, without calling
+    // setState synchronously inside the effect body — deferred a tick via
+    // queueMicrotask so React finishes the current commit first.
+    queueMicrotask(() => setLoading(true));
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on week change only; `load` itself is stable per render and re-including it would refetch on every render.
+  }, [weekStart]);
 
   const employeeName = (id: string, fallback: string) => employees.find((e) => e.id === id)?.name ?? fallback;
   const locationName = (id: string | null) => (id && locations.find((l) => l.id === id)?.name) || "—";
@@ -1123,6 +1129,93 @@ export function StaffDirectoryView({ employees, locations }: { employees: Employ
 }
 
 /* ---------------- Locations ---------------- */
+// Leaflet touches `window` at import time, so it's loaded dynamically inside
+// the effect (never at module scope) — importing it eagerly would crash
+// Next's server render. Tiles come from the public OpenStreetMap tile
+// server and the marker icon assets from the unpkg CDN (Leaflet's default
+// icon URLs are relative paths that don't resolve once bundled), so this
+// needs network access but no API key.
+function GeofenceMapPicker({ lat, lng, radius, onMove }: {
+  lat: number; lng: number; radius: number; onMove: (lat: number, lng: number) => void;
+}) {
+  const { t } = useLanguage();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapObjRef = useRef<{ map: L.Map; marker: L.Marker; circle: L.Circle } | null>(null);
+  const onMoveRef = useRef(onMove);
+  useEffect(() => { onMoveRef.current = onMove; });
+  const [locating, setLocating] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const leaflet = await import("leaflet");
+      const Lmod = leaflet.default;
+      if (cancelled || !containerRef.current || mapObjRef.current) return;
+      const start: [number, number] = [lat || 55.6761, lng || 12.5683];
+      const map = Lmod.map(containerRef.current).setView(start, lat && lng ? 16 : 11);
+      Lmod.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+      const icon = Lmod.icon({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
+      });
+      const marker = Lmod.marker(start, { draggable: true, icon }).addTo(map);
+      const circle = Lmod.circle(start, { radius, color: "#1c3a5e", fillColor: "#1c3a5e", fillOpacity: 0.12 }).addTo(map);
+      marker.on("drag", () => circle.setLatLng(marker.getLatLng()));
+      marker.on("dragend", () => { const p = marker.getLatLng(); onMoveRef.current(p.lat, p.lng); });
+      map.on("click", (e: L.LeafletMouseEvent) => {
+        marker.setLatLng(e.latlng);
+        circle.setLatLng(e.latlng);
+        onMoveRef.current(e.latlng.lat, e.latlng.lng);
+      });
+      mapObjRef.current = { map, marker, circle };
+    })();
+    return () => {
+      cancelled = true;
+      if (mapObjRef.current) { mapObjRef.current.map.remove(); mapObjRef.current = null; }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize once; lat/lng/radius are pushed in via the effects below instead of re-running this setup.
+  }, []);
+
+  // Re-center the pin when lat/lng change from outside the map (typing in
+  // the numeric fields, or "use my location" below) without rebuilding it.
+  useEffect(() => {
+    if (!mapObjRef.current || !lat || !lng) return;
+    const pos: [number, number] = [lat, lng];
+    mapObjRef.current.marker.setLatLng(pos);
+    mapObjRef.current.circle.setLatLng(pos);
+    mapObjRef.current.map.setView(pos, mapObjRef.current.map.getZoom() < 14 ? 16 : mapObjRef.current.map.getZoom());
+  }, [lat, lng]);
+
+  useEffect(() => { mapObjRef.current?.circle.setRadius(radius); }, [radius]);
+
+  const useMyLocation = async () => {
+    setLocating(true);
+    try {
+      const permissions = await Geolocation.requestPermissions();
+      if (permissions.location === "denied") return;
+      const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 });
+      onMove(position.coords.latitude, position.coords.longitude);
+    } catch {
+      // Silently ignored — this is a convenience shortcut; the manager can
+      // still drag the pin or type coordinates directly.
+    } finally { setLocating(false); }
+  };
+
+  return (
+    <div className="geofence-map-wrap">
+      <div ref={containerRef} className="geofence-map" />
+      <button type="button" className="secondary-button geofence-locate" onClick={useMyLocation} disabled={locating}>
+        <MapPin size={14} /> {locating ? t("time.locating") : t("locations.useMyLocation")}
+      </button>
+    </div>
+  );
+}
+
 export function LocationsView({ locations, employees, currentUser, onCreate, onOpenStaff, onVerify }: {
   locations: LocationT[]; employees: EmployeeT[]; currentUser: CurrentUser;
   onCreate: (name: string) => void; onOpenStaff: () => void;
@@ -1191,6 +1284,10 @@ export function LocationsView({ locations, employees, currentUser, onCreate, onO
             <button className="modal-close" onClick={() => setVerifying(null)} aria-label={t("common.close")}><X size={18} /></button>
             <div className="modal-orb"><MapPin size={22} /></div><span className="modal-kicker">{t("locations.geofenceKicker")}</span><h2>{verifying.name}</h2>
             <p>{t("locations.geofenceBody")}</p>
+            <GeofenceMapPicker
+              lat={Number(lat) || 0} lng={Number(lng) || 0} radius={Number(radius) || 50}
+              onMove={(newLat, newLng) => { setLat(newLat.toFixed(6)); setLng(newLng.toFixed(6)); }}
+            />
             <div className="transfer-form">
               <div className="date-fields">
                 <label><span>{t("locations.latitude")}</span><input value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" /></label>
