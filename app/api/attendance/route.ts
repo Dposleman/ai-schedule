@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { attendance, locations, shifts } from "@/db/schema";
+import { attendance, attendanceBreaks, locations, shifts } from "@/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { requireUser, badRequest, withRoute } from "@/lib/api";
 import { newId } from "@/lib/auth";
@@ -42,7 +42,15 @@ export const GET = withRoute(async () => {
     .where(and(eq(attendance.userId, user.id), isNull(attendance.checkOutAt)))
     .orderBy(desc(attendance.createdAt))
     .limit(1);
-  return NextResponse.json({ open: open ?? null });
+  let openBreak = null;
+  if (open) {
+    [openBreak] = await db
+      .select()
+      .from(attendanceBreaks)
+      .where(and(eq(attendanceBreaks.attendanceId, open.id), isNull(attendanceBreaks.endAt)))
+      .limit(1);
+  }
+  return NextResponse.json({ open: open ?? null, openBreak: openBreak ?? null });
 });
 
 export const POST = withRoute(async (request: NextRequest) => {
@@ -133,9 +141,17 @@ export const POST = withRoute(async (request: NextRequest) => {
   }
 
   // body.action === "check-out"
+  const now = new Date().toISOString();
+  // Close out any break still running under this session — checking out
+  // implicitly ends it rather than leaving an open-ended break row behind
+  // (which would otherwise show as "still on break" forever in review).
+  await db
+    .update(attendanceBreaks)
+    .set({ endAt: now })
+    .where(and(eq(attendanceBreaks.attendanceId, body.id), eq(attendanceBreaks.userId, user.id), isNull(attendanceBreaks.endAt)));
   await db
     .update(attendance)
-    .set({ checkOutAt: new Date().toISOString(), autoCheckout: body.auto ? 1 : 0 })
+    .set({ checkOutAt: now, autoCheckout: body.auto ? 1 : 0 })
     .where(and(eq(attendance.id, body.id), eq(attendance.userId, user.id)));
   return NextResponse.json({ ok: true });
 });

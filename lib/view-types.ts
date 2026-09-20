@@ -55,6 +55,10 @@ export type NotificationT = { id: string; type: string; title: string; body: str
 // open attendance record) — kept here too so it's typed instead of `any`.
 export type OpenAttendanceT = { id: string; checkInAt: string; checkOutAt: string | null };
 
+// GET /api/attendance's openBreak — the current user's running break under
+// their open attendance session, if any (see app/api/attendance/break/route.ts).
+export type OpenBreakT = { id: string; startAt: string; endAt: string | null };
+
 // GET /api/attendance/today — org-wide, for Overview's staffing/exceptions
 // panel. shiftId is null for a clock-in that wasn't tied to a scheduled
 // shift (see app/api/attendance/route.ts).
@@ -69,6 +73,7 @@ export type TimesheetRowT = {
   shiftId: string | null; shiftDate: string | null; shiftStart: string | null; shiftEnd: string | null; shiftLocationId: string | null;
   checkInAt: string | null; checkOutAt: string | null; autoCheckout: number;
   approved: number; approvedBy: string | null; approvedAt: string | null;
+  breakMinutes: number; onBreak: boolean;
 };
 
 // GET /api/audit — owner-only (see lib/audit.ts for the AuditAction union).

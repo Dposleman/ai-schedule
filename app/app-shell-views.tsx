@@ -480,10 +480,12 @@ export function TimeTrackingView({ location, locations, employees, currentUser, 
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<OpenAttendanceT | null>(null);
+  const [openBreak, setOpenBreak] = useState<{ id: string; startAt: string } | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [breakBusy, setBreakBusy] = useState(false);
 
   useEffect(() => {
-    apiFetch("/api/attendance").then((r) => r.json()).then((data) => { setOpen(data.open); setLoaded(true); }).catch(() => setLoaded(true));
+    apiFetch("/api/attendance").then((r) => r.json()).then((data) => { setOpen(data.open); setOpenBreak(data.openBreak ?? null); setLoaded(true); }).catch(() => setLoaded(true));
   }, []);
 
   const inside = location && distance !== null && distance <= location.radiusMeters && (accuracy ?? 999) <= 60;
@@ -522,7 +524,23 @@ export function TimeTrackingView({ location, locations, employees, currentUser, 
     try {
       await apiFetch("/api/attendance", { method: "POST", body: JSON.stringify({ action: "check-out", id: open.id }) });
       setOpen(null);
+      setOpenBreak(null);
     } catch (e) { onError(e); }
+  };
+
+  const toggleBreak = async () => {
+    setBreakBusy(true);
+    try {
+      if (openBreak) {
+        await apiFetch("/api/attendance/break", { method: "POST", body: JSON.stringify({ action: "end", id: openBreak.id }) });
+        setOpenBreak(null);
+      } else {
+        const response = await apiFetch("/api/attendance/break", { method: "POST", body: JSON.stringify({ action: "start" }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        setOpenBreak({ id: data.id, startAt: new Date().toISOString() });
+      }
+    } catch (e) { onError(e); } finally { setBreakBusy(false); }
   };
 
   const isManager = currentUser.role !== "employee";
@@ -554,7 +572,13 @@ export function TimeTrackingView({ location, locations, employees, currentUser, 
               {!loaded ? null : !open ? (
                 <button className="primary-button" disabled={!inside || !location.verified} onClick={checkIn}><Fingerprint size={17} /> {location.verified ? t("time.checkIn") : t("time.checkInBlocked")}</button>
               ) : (
-                <><span className="clocked"><i /> {t("time.checkedInAt", { time: new Date(open.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</span><button className="primary-button" onClick={checkOut}>{t("time.checkOut")}</button></>
+                <>
+                  <span className="clocked"><i /> {openBreak ? t("time.onBreakSince", { time: new Date(openBreak.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : t("time.checkedInAt", { time: new Date(open.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })}</span>
+                  <div className="clock-panel-actions">
+                    <button className="secondary-button" onClick={toggleBreak} disabled={breakBusy}><Clock3 size={15} /> {openBreak ? t("time.endBreak") : t("time.startBreak")}</button>
+                    <button className="primary-button" onClick={checkOut}>{t("time.checkOut")}</button>
+                  </div>
+                </>
               )}
             </div>
           </section>
@@ -630,17 +654,21 @@ function TimesheetReviewSection({ employees, locations }: { employees: EmployeeT
       ) : (
         <div className="timesheet-table">
           <div className="timesheet-row timesheet-head">
-            <span>{t("team.colEmployee")}</span><span>{t("time.scheduledCol")}</span><span>{t("time.actualCol")}</span><span>{t("time.varianceCol")}</span><span>{t("team.colStatus")}</span><span />
+            <span>{t("team.colEmployee")}</span><span>{t("time.scheduledCol")}</span><span>{t("time.actualCol")}</span><span>{t("time.breaksCol")}</span><span>{t("time.varianceCol")}</span><span>{t("team.colStatus")}</span><span />
           </div>
           {records.map((row) => {
             const scheduledMin = row.shiftStart && row.shiftEnd ? hoursBetween(row.shiftStart, row.shiftEnd) * 60 : null;
             const actualMin = row.checkInAt && row.checkOutAt ? (new Date(row.checkOutAt).getTime() - new Date(row.checkInAt).getTime()) / 60000 : null;
-            const variance = scheduledMin !== null && actualMin !== null ? Math.round(actualMin - scheduledMin) : null;
+            // Variance is against NET worked time (actual minus break minutes),
+            // not raw clocked duration — a 30-minute lunch shouldn't read as
+            // "30 minutes over schedule".
+            const variance = scheduledMin !== null && actualMin !== null ? Math.round(actualMin - row.breakMinutes - scheduledMin) : null;
             return (
               <div className="timesheet-row" key={row.id}>
                 <span className="person-summary"><span className={`avatar ${employees.find((e) => e.id === row.userId)?.color ?? "blue"}`}>{initials(employeeName(row.userId, row.userName))}</span><span><strong>{employeeName(row.userId, row.userName)}</strong><small>{locationName(row.shiftLocationId)}</small></span></span>
                 <span>{row.shiftStart && row.shiftEnd ? `${row.shiftDate} · ${row.shiftStart}–${row.shiftEnd}` : t("time.noSchedule")}</span>
                 <span>{row.checkInAt ? new Date(row.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}–{row.checkOutAt ? new Date(row.checkOutAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : t("time.stillOpen")}{row.autoCheckout === 1 && <em className="conflict-note">{t("time.autoCheckoutTag")}</em>}</span>
+                <span>{row.breakMinutes > 0 ? `${row.breakMinutes} min` : "—"}{row.onBreak && <em className="conflict-note">{t("time.onBreakTag")}</em>}</span>
                 <span className={variance === null ? "" : Math.abs(variance) < 10 ? "variance-ok" : "variance-warn"}>{variance === null ? "—" : `${variance > 0 ? "+" : ""}${variance} min`}</span>
                 <span><em className={`status-pill ${row.approved ? "available" : "away"}`}>{row.approved ? t("time.approved") : t("time.pendingReview")}</em></span>
                 <span className="timesheet-actions">

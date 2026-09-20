@@ -160,6 +160,20 @@ export const attendance = pgTable("attendance", {
   approvedAt: timestamp("approved_at", { mode: "string" }),
 });
 
+// One row per break within an open attendance session (master prompt 11.4
+// timesheet review: "scheduled vs actual, breaks, variance, status and
+// corrections"). endAt is null while the break is running — same open/closed
+// shape as attendance.checkOutAt. A break always belongs to exactly one
+// attendance record and is deleted with it.
+export const attendanceBreaks = pgTable("attendance_breaks", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  attendanceId: text("attendance_id").notNull().references(() => attendance.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  startAt: text("start_at").notNull(),
+  endAt: text("end_at"),
+});
+
 // type: coverage_invite | coverage_needed | coverage_accepted | coverage_escalated | absence_requested | absence_decided
 export const notifications = pgTable("notifications", {
   id: text("id").primaryKey(),

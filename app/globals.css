@@ -340,7 +340,7 @@ button { color: inherit; font: inherit; }
 .status-pill.available { background: var(--success-soft); color: var(--green); }
 .timesheet-card { margin-top: 6px; }
 .timesheet-table { overflow-x: auto; }
-.timesheet-row { display: grid; grid-template-columns: 1.4fr 1.3fr 1.2fr .8fr .9fr 1fr; align-items: center; gap: 12px; min-width: 920px; padding: 12px 18px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.timesheet-row { display: grid; grid-template-columns: 1.4fr 1.3fr 1.2fr .7fr .8fr .9fr 1fr; align-items: center; gap: 12px; min-width: 1020px; padding: 12px 18px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
 .timesheet-row:last-child { border-bottom: 0; }
 .timesheet-head { height: 39px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--canvas); color: var(--muted-soft); font-size: 11px; font-weight: 900; letter-spacing: .09em; }
 .timesheet-actions { display: flex; gap: 6px; }
@@ -600,6 +600,8 @@ button { color: inherit; font: inherit; }
 .clock-panel > small { color: var(--muted); font-size: 12.5px; }
 .clock-panel > strong { margin: 5px 0 15px; font-family: var(--font-display), sans-serif; font-size: 24px; }
 .clock-panel .primary-button { width: 100%; }
+.clock-panel-actions { display: flex; flex-direction: column; gap: 8px; }
+.clock-panel-actions .primary-button, .clock-panel-actions .secondary-button { width: 100%; }
 .clocked, .checkout-done { display: flex; align-items: center; gap: 6px; margin: 10px 0; border-radius: 8px; background: var(--success-soft); padding: 8px; color: var(--green); font-size: 12.5px; }
 .clocked i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .geofence-monitor { display: flex; align-items: center; gap: 12px; border-radius: 11px; padding: 15px 17px; }

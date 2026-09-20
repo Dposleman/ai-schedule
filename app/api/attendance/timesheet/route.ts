@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { attendance, shifts, users } from "@/db/schema";
-import { and, eq, gte, lt } from "drizzle-orm";
+import { attendance, attendanceBreaks, shifts, users } from "@/db/schema";
+import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { requireUser, requireCapability, withRoute } from "@/lib/api";
 import { parseQuery, zDate } from "@/lib/validation";
 
@@ -48,5 +48,30 @@ export const GET = withRoute(async (request: NextRequest) => {
     .innerJoin(users, eq(attendance.userId, users.id))
     .where(and(eq(attendance.orgId, user.orgId), gte(attendance.checkInAt, windowStart), lt(attendance.checkInAt, windowEnd)));
 
-  return NextResponse.json({ records: rows });
+  // Breaks aggregated in a second query (rather than a SQL join) so a
+  // record with multiple breaks doesn't fan the attendance row out into
+  // duplicates above.
+  const breakMinutesByAttendance = new Map<string, number>();
+  let onBreakAttendanceIds = new Set<string>();
+  if (rows.length > 0) {
+    const attendanceIds = rows.map((r) => r.id);
+    const breakRows = await db
+      .select({ attendanceId: attendanceBreaks.attendanceId, startAt: attendanceBreaks.startAt, endAt: attendanceBreaks.endAt })
+      .from(attendanceBreaks)
+      .where(inArray(attendanceBreaks.attendanceId, attendanceIds));
+    for (const b of breakRows) {
+      if (!b.endAt) continue;
+      const minutes = (new Date(b.endAt).getTime() - new Date(b.startAt).getTime()) / 60000;
+      breakMinutesByAttendance.set(b.attendanceId, (breakMinutesByAttendance.get(b.attendanceId) ?? 0) + minutes);
+    }
+    onBreakAttendanceIds = new Set(breakRows.filter((b) => !b.endAt).map((b) => b.attendanceId));
+  }
+
+  const enriched = rows.map((r) => ({
+    ...r,
+    breakMinutes: Math.round(breakMinutesByAttendance.get(r.id) ?? 0),
+    onBreak: onBreakAttendanceIds.has(r.id),
+  }));
+
+  return NextResponse.json({ records: enriched });
 });
